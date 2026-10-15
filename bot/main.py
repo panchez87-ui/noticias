@@ -124,29 +124,79 @@ def enviar_telegram(texto, dry_run):
 # Calendario económico
 # ---------------------------------------------------------------------------
 
-def leer_calendario():
-    """Eventos relevantes de la semana, con la hora convertida a Ecuador."""
-    datos = json.loads(http_get(config.CALENDARIO_URL))
+def nombre_evento(titulo):
+    nombre = config.NOMBRES_INDICADORES.get(titulo, titulo)
+    for sufijo in (" Speaks", " Speech"):
+        if nombre.endswith(sufijo):
+            nombre = "Discurso: " + nombre[:-len(sufijo)]
+    return nombre
+
+
+def valor_tv(e, campo):
+    """Formatea un valor de TradingView con su escala y unidad (p. ej. 199K, 1.3%)."""
+    v = e.get(campo)
+    if v is None:
+        return None
+    texto = f"{v:g}" + (e.get("scale") or "")
+    unidad = (e.get("unit") or "").strip()
+    if unidad == "%":
+        texto += "%"
+    elif unidad:
+        texto += f" {unidad}"
+    return texto
+
+
+def leer_calendario_tradingview():
+    hoy = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    params = urllib.parse.urlencode({
+        "from": (hoy - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "to": (hoy + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "countries": config.CALENDARIO_PAIS,
+    })
+    req = urllib.request.Request(f"{config.CALENDARIO_URL}?{params}", headers={
+        "User-Agent": "Mozilla/5.0", "Origin": "https://www.tradingview.com"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        datos = json.loads(r.read())["result"]
     eventos = []
     for e in datos:
-        if e.get("country") not in config.CALENDARIO_PAISES:
+        if (e.get("importance") or -1) < config.CALENDARIO_IMPORTANCIA_MIN and e.get("title") not in config.CALENDARIO_EXTRA:
             continue
-        if e.get("impact") not in config.CALENDARIO_IMPACTOS and e.get("title") not in config.CALENDARIO_EXTRA:
-            continue
-        try:
-            fecha = datetime.fromisoformat(e["date"]).astimezone(config.ZONA_LOCAL)
-        except Exception:
-            continue
-        nombre = config.NOMBRES_INDICADORES.get(e["title"], e["title"])
-        if nombre.endswith(" Speaks"):
-            nombre = "Discurso: " + nombre[:-len(" Speaks")]
         eventos.append({
-            "fecha": fecha,
+            "fecha": datetime.fromisoformat(e["date"].replace("Z", "+00:00")).astimezone(config.ZONA_LOCAL),
             "titulo": e["title"],
-            "nombre": nombre,
+            "nombre": nombre_evento(e["title"]),
+            "real": valor_tv(e, "actual"),
+            "estimado": valor_tv(e, "forecast") or "—",
+            "anterior": valor_tv(e, "previous") or "—",
+        })
+    return eventos
+
+
+def leer_calendario_forexfactory():
+    eventos = []
+    for e in json.loads(http_get(config.CALENDARIO_RESPALDO_URL)):
+        if e.get("country") != "USD":
+            continue
+        if e.get("impact") != "High" and e.get("title") not in config.CALENDARIO_RESPALDO_EXTRA:
+            continue
+        eventos.append({
+            "fecha": datetime.fromisoformat(e["date"]).astimezone(config.ZONA_LOCAL),
+            "titulo": e["title"],
+            "nombre": nombre_evento(e["title"]),
+            "real": None,  # ForexFactory no publica el dato real en su JSON
             "estimado": e.get("forecast") or "—",
             "anterior": e.get("previous") or "—",
         })
+    return eventos
+
+
+def leer_calendario():
+    """Eventos relevantes, con la hora convertida a Ecuador."""
+    try:
+        eventos = leer_calendario_tradingview()
+    except Exception as e:
+        log(f"AVISO: falló el calendario de TradingView ({e}); se usa ForexFactory (sin dato real).")
+        eventos = leer_calendario_forexfactory()
     return sorted(eventos, key=lambda x: x["fecha"])
 
 
@@ -158,7 +208,8 @@ def agrupar_por_hora(eventos):
 
 
 def linea_evento(e):
-    return (f"• <b>{html.escape(e['nombre'])}</b> — est: {html.escape(e['estimado'])}"
+    real = f"real: <b>{html.escape(e['real'])}</b> | " if e.get("real") else ""
+    return (f"• <b>{html.escape(e['nombre'])}</b> — {real}est: {html.escape(e['estimado'])}"
             f" | ant: {html.escape(e['anterior'])}")
 
 
@@ -204,7 +255,7 @@ def agenda_de_hoy(eventos):
         return "📅 <b>Agenda macro EE. UU.</b>\nSin datos de alto impacto hoy."
     lineas = ["📅 <b>Agenda macro EE. UU. (hora Ecuador)</b>"]
     for fecha, grupo in grupos:
-        marca = " ✅ ya publicado" if fecha <= ahora() else ""
+        marca = " ✅ publicado" if fecha <= ahora() else ""
         lineas.append(f"\n<b>{fecha:%H:%M}</b>{marca}")
         lineas += [linea_evento(e) for e in grupo]
     return "\n".join(lineas)
@@ -456,7 +507,7 @@ def main():
     eventos, error_calendario = [], None
     try:
         eventos = leer_calendario()
-        log(f"Calendario: {len(eventos)} eventos relevantes esta semana.")
+        log(f"Calendario: {len(eventos)} eventos relevantes entre ayer y los próximos 3 días.")
     except Exception as e:
         error_calendario = str(e)
         log(f"ERROR leyendo el calendario: {e}")

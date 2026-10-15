@@ -15,27 +15,67 @@ ZONA_LOCAL = timezone(timedelta(hours=-5))
 HORA_RESUMEN = 8  # la primera corrida desde las 8:00 manda el resumen del día
 
 # ---------------------------------------------------------------------------
-# Calendario económico (ForexFactory; Investing.com bloquea a los bots).
+# Calendario económico. Fuente principal: TradingView (trae el dato real
+# publicado). Respaldo: ForexFactory (sin dato real). Investing.com bloquea
+# a los bots.
 # ---------------------------------------------------------------------------
-CALENDARIO_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-CALENDARIO_PAISES = ["USD"]
-CALENDARIO_IMPACTOS = ["High"]
-# Eventos que se avisan aunque no sean de impacto alto (título exacto de ForexFactory).
+CALENDARIO_URL = "https://economic-calendar.tradingview.com/events"
+CALENDARIO_PAIS = "US"
+CALENDARIO_IMPORTANCIA_MIN = 1  # TradingView: 1 = alta, 0 = media, -1 = baja
+# Eventos que se avisan aunque no sean de importancia alta (título exacto de TradingView).
 CALENDARIO_EXTRA = [
-    "Unemployment Claims",
-    "Flash Manufacturing PMI",
-    "Flash Services PMI",
-    # "Crude Oil Inventories",
-    # "Natural Gas Storage",
+    "Initial Jobless Claims",
+    "S&P Global Manufacturing PMI Flash",
+    "S&P Global Services PMI Flash",
+    "Core PPI MoM",
+    "Retail Sales Ex Autos MoM",
+    "Average Hourly Earnings MoM",
+    # "EIA Crude Oil Stocks Change",
 ]
+
+CALENDARIO_RESPALDO_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+CALENDARIO_RESPALDO_EXTRA = ["Unemployment Claims", "Flash Manufacturing PMI", "Flash Services PMI"]
 MINUTOS_ANTES = 10
 # Cuánto mira hacia adelante cada corrida. Algo más de 60 min para cubrir los
 # retrasos de GitHub Actions; los avisos ya enviados no se repiten.
 HORIZONTE_MINUTOS = 75
 
-# Nombres en español de los indicadores más comunes. Lo que no esté aquí se
-# muestra con el título original de ForexFactory.
+# Nombres en español de los indicadores más comunes (títulos de TradingView y,
+# más abajo, de ForexFactory). Lo que no esté aquí se muestra con el título original.
 NOMBRES_INDICADORES = {
+    "Inflation Rate MoM": "IPC (inflación general) m/m",
+    "Inflation Rate YoY": "IPC (inflación general) a/a",
+    "Core Inflation Rate MoM": "IPC subyacente m/m",
+    "Core Inflation Rate YoY": "IPC subyacente a/a",
+    "PPI MoM": "IPP (precios al productor) m/m",
+    "Core PPI MoM": "IPP subyacente m/m",
+    "Core PCE Price Index MoM": "PCE subyacente m/m",
+    "Core PCE Price Index YoY": "PCE subyacente a/a",
+    "Personal Income MoM": "Ingreso personal m/m",
+    "Personal Spending MoM": "Gasto personal m/m",
+    "Non Farm Payrolls": "Nóminas no agrícolas (NFP)",
+    "Average Hourly Earnings MoM": "Salario medio por hora m/m",
+    "JOLTs Job Openings": "Vacantes laborales JOLTS",
+    "Initial Jobless Claims": "Subsidios por desempleo",
+    "S&P Global Manufacturing PMI Flash": "PMI manufacturero S&P (preliminar)",
+    "S&P Global Services PMI Flash": "PMI de servicios S&P (preliminar)",
+    "Retail Sales MoM": "Ventas minoristas m/m",
+    "Retail Sales Ex Autos MoM": "Ventas minoristas sin autos m/m",
+    "GDP Growth Rate QoQ Adv": "PIB (avance) t/t",
+    "GDP Growth Rate QoQ 2nd Est": "PIB (2.ª estimación) t/t",
+    "GDP Growth Rate QoQ Final": "PIB (final) t/t",
+    "Fed Interest Rate Decision": "Decisión de tasas de la Fed",
+    "Fed Press Conference": "Conferencia de prensa de la Fed",
+    "FOMC Minutes": "Actas del FOMC",
+    "FOMC Economic Projections": "Proyecciones económicas del FOMC",
+    "Michigan Consumer Sentiment Prel": "Sentimiento del consumidor U. Michigan (prelim.)",
+    "Michigan Consumer Sentiment Final": "Sentimiento del consumidor U. Michigan (final)",
+    "Durable Goods Orders MoM": "Pedidos de bienes duraderos m/m",
+    "Building Permits Prel": "Permisos de construcción (prelim.)",
+    "Housing Starts": "Inicios de vivienda",
+    "Existing Home Sales": "Ventas de viviendas usadas",
+    "EIA Crude Oil Stocks Change": "Inventarios de crudo (EIA)",
+    # ForexFactory (respaldo)
     "CPI m/m": "IPC (inflación general) m/m",
     "CPI y/y": "IPC (inflación general) a/a",
     "Core CPI m/m": "IPC subyacente m/m",

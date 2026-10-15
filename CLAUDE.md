@@ -9,7 +9,7 @@ Requisitos del usuario (2026-10-15):
 - Corre cada hora de 7 a 22 h (Ecuador), de lunes a viernes. Costo $0.
 
 Decisiones:
-- Investing.com da 403 (bloquea bots), así que se usa el JSON de ForexFactory.
+- Investing.com da 403 (bloquea bots). Calendario: TradingView (economic-calendar.tradingview.com, con dato real; requiere header Origin) y ForexFactory como respaldo.
 - Las noticias vienen de Google News RSS (`when:1d/3d/3h`) más feeds directos.
 - Gemini en tier gratuito: `gemini-3.8-flash` y, como respaldo, `gemini-3.5-flash-lite` (verificado el 2026-10-15).
 

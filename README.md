@@ -4,13 +4,13 @@ Corre gratis en GitHub Actions, cada hora de 7:00 a 22:00 (hora de Ecuador), de 
 
 | Qué | Cuándo |
 |---|---|
-| ⏰ Aviso de dato macro de EE. UU. (impacto alto + subsidios y PMI preliminares), con estimado y anterior | 10 min antes de cada publicación |
+| ⏰ Aviso de dato macro de EE. UU. (importancia alta + subsidios, PMI preliminares y otros extras), con estimado y anterior | 10 min antes de cada publicación |
 | ☀️ Resumen: agenda macro del día + las ~8 noticias más importantes (el lunes incluye el fin de semana) | 8:00 |
 | 🚨 Noticia urgente | Solo si es sumamente importante; si no, silencio |
 
 Temas: petróleo, gas natural, centros de datos, IA, oro, maíz, litio, dólar y Fed/tasas.
 
-- **Calendario:** ForexFactory (JSON gratuito). Investing.com bloquea los accesos automáticos (error 403).
+- **Calendario:** TradingView (gratuito, incluye el dato real publicado); si falla, ForexFactory (sin dato real). Investing.com bloquea los accesos automáticos (error 403).
 - **Noticias:** Google News por tema, más feeds de la Fed, OilPrice, CNBC Energía y DatacenterDynamics.
 - **Filtro y resúmenes:** Google Gemini, tier gratuito (`gemini-3.8-flash`; si falla, usa `gemini-3.5-flash-lite`).
 
@@ -38,5 +38,5 @@ Cada corrida dura aproximadamente 1 minuto. Si hay un dato macro antes de la sig
 ## Limitaciones
 
 - GitHub puede retrasar las corridas programadas, en momentos de mucha carga hasta 15-30 minutos. Si la corrida de las 7:00 arranca tarde, el aviso de las 7:20 (datos de las 8:30 ET mientras rija el horario de verano de EE. UU.) sale tarde o justo a la hora del dato. Si esto pasa seguido, se puede disparar el workflow desde cron-job.org, que es puntual y gratuito.
-- ForexFactory no incluye el dato real publicado; el aviso trae solo el estimado y el anterior.
+- El calendario de TradingView no es una API oficial: si deja de funcionar, el bot pasa solo a ForexFactory (sin dato real).
 - GitHub desactiva los workflows programados tras 60 días sin actividad. Los commits de estado que hace el propio bot cuentan como actividad.
