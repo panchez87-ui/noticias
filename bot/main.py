@@ -222,7 +222,10 @@ def clave_titular(titulo):
 
 
 def url_google_news(busqueda, ventana):
-    q = urllib.parse.quote(f"{busqueda} when:{ventana}")
+    consulta = f"({busqueda})"
+    if config.MEDIOS_CONFIABLES:
+        consulta += " (" + " OR ".join(f"site:{m}" for m in config.MEDIOS_CONFIABLES) + ")"
+    q = urllib.parse.quote(f"{consulta} when:{ventana}")
     return f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
 
 

@@ -89,6 +89,16 @@ TEMAS = {
     "fed": {"etiqueta": "🏦 Fed y tasas", "busqueda": '"Federal Reserve" OR FOMC OR "Fed chair"'},
 }
 
+# Las búsquedas de Google News se limitan a estos medios (sin esta lista
+# entraban ~190 medios, muchos locales, de brókers o irrelevantes).
+# Lista vacía = cualquier medio.
+MEDIOS_CONFIABLES = [
+    "reuters.com", "bloomberg.com", "cnbc.com", "wsj.com", "ft.com",
+    "marketwatch.com", "finance.yahoo.com", "kitco.com", "oilprice.com",
+    "naturalgasintel.com", "spglobal.com", "argusmedia.com",
+    "dtnpf.com", "profarmer.com", "agweb.com", "mining.com",
+]
+
 FEEDS_DIRECTOS = [
     {"tema": "fed", "fuente": "Federal Reserve", "url": "https://www.federalreserve.gov/feeds/press_monetary.xml"},
     {"tema": "petroleo", "fuente": "OilPrice.com", "url": "https://oilprice.com/rss/main"},
