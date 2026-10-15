@@ -1,0 +1,58 @@
+name: Bot macro y noticias
+
+# Cada hora de 7:00 a 22:00 hora de Ecuador (UTC-5 todo el año), lunes a viernes:
+#   7:00-18:00 Ecuador  = 12:00-23:00 UTC de lunes a viernes
+#   19:00-22:00 Ecuador = 00:00-03:00 UTC del día siguiente (martes a sábado)
+# GitHub puede retrasar unos minutos las corridas programadas; el bot lo
+# compensa mirando 75 minutos hacia adelante en el calendario.
+on:
+  schedule:
+    - cron: "0 12-23 * * 1-5"
+    - cron: "0 0-3 * * 2-6"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "auto, resumen, urgentes o calendario"
+        default: "auto"
+
+permissions:
+  contents: write
+
+# Una corrida a la vez: si una está esperando un aviso del calendario, la
+# siguiente espera a que termine (así no se duplican avisos).
+concurrency:
+  group: bot-macro
+  cancel-in-progress: false
+
+jobs:
+  correr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Ejecutar bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python bot/main.py --modo "${{ inputs.modo || 'auto' }}"
+
+      - name: Guardar estado
+        if: always()
+        run: |
+          git config user.name "bot-macro"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/state.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Sin cambios de estado."
+          else
+            git commit -m "estado del bot [skip ci]"
+            git push
+          fi
