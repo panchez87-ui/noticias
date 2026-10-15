@@ -363,7 +363,13 @@ Titulares:
             log("Sin GEMINI_API_KEY en dry-run: se muestran los primeros titulares sin filtrar.")
             seleccion = [(n, n["titulo"], "") for n in noticias[:config.MAX_NOTICIAS_RESUMEN]]
         else:
-            seleccion = elegidas(preguntar_gemini(prompt), noticias)[:config.MAX_NOTICIAS_RESUMEN]
+            try:
+                seleccion = elegidas(preguntar_gemini(prompt), noticias)[:config.MAX_NOTICIAS_RESUMEN]
+            except Exception as e:
+                # La agenda macro llega igual aunque la IA falle.
+                log(f"ERROR con Gemini: {e}")
+                partes.append("⚠️ <i>No se pudo usar Gemini para elegir las noticias; revisa GEMINI_API_KEY "
+                              "o los logs en Actions.</i>")
 
     if seleccion:
         partes.append("📰 <b>Lo más importante</b>\n\n" + "\n\n".join(linea_noticia(n, r) for n, r, _ in seleccion))
