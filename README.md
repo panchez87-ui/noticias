@@ -5,6 +5,7 @@ Corre gratis en GitHub Actions, cada hora de 7:00 a 22:00 (hora de Ecuador), de 
 | Qué | Cuándo |
 |---|---|
 | ⏰ Aviso de dato macro de EE. UU. (importancia alta + subsidios, PMI preliminares y otros extras), con estimado y anterior | 10 min antes de cada publicación |
+| 📊 Dato real publicado, comparado con el estimado (▲ / ▼ / =) | ~3 min después de cada publicación (o en la corrida siguiente) |
 | ☀️ Resumen: agenda macro del día + las ~8 noticias más importantes (el lunes incluye el fin de semana) | 8:00 |
 | 🚨 Noticia urgente | Solo si es sumamente importante; si no, silencio |
 

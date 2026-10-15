@@ -36,6 +36,7 @@ CALENDARIO_EXTRA = [
 CALENDARIO_RESPALDO_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 CALENDARIO_RESPALDO_EXTRA = ["Unemployment Claims", "Flash Manufacturing PMI", "Flash Services PMI"]
 MINUTOS_ANTES = 10
+MINUTOS_DESPUES = 3  # margen para que TradingView cargue el dato real antes de enviarlo
 # Cuánto mira hacia adelante cada corrida. Algo más de 60 min para cubrir los
 # retrasos de GitHub Actions; los avisos ya enviados no se repiten.
 HORIZONTE_MINUTOS = 75

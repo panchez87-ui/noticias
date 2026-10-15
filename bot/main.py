@@ -71,6 +71,7 @@ def cargar_estado():
             log(f"AVISO: no se pudo leer el estado ({e}); se empieza de cero.")
     estado.setdefault("vistos", {})        # noticias ya procesadas: clave -> fecha
     estado.setdefault("avisados", {})      # eventos del calendario ya avisados
+    estado.setdefault("publicados", {})    # eventos cuyo dato real ya se envió
     estado.setdefault("urgentes", [])      # titulares enviados como urgentes
     estado.setdefault("ultimo_resumen", None)
     return estado
@@ -82,6 +83,7 @@ def guardar_estado(estado, dry_run):
     limite = (ahora() - timedelta(days=config.DIAS_MEMORIA)).isoformat()
     estado["vistos"] = {k: v for k, v in estado["vistos"].items() if v >= limite}
     estado["avisados"] = {k: v for k, v in estado["avisados"].items() if v >= limite}
+    estado["publicados"] = {k: v for k, v in estado["publicados"].items() if v >= limite}
     estado["urgentes"] = [u for u in estado["urgentes"] if u["fecha"] >= limite]
     ARCHIVO_ESTADO.parent.mkdir(parents=True, exist_ok=True)
     ARCHIVO_ESTADO.write_text(json.dumps(estado, ensure_ascii=False, indent=1, sort_keys=True),
@@ -166,6 +168,8 @@ def leer_calendario_tradingview():
             "titulo": e["title"],
             "nombre": nombre_evento(e["title"]),
             "real": valor_tv(e, "actual"),
+            "real_num": e.get("actual"),
+            "est_num": e.get("forecast"),
             "estimado": valor_tv(e, "forecast") or "—",
             "anterior": valor_tv(e, "previous") or "—",
         })
@@ -219,33 +223,77 @@ def mensaje_aviso(fecha, eventos):
     return "\n".join(lineas)
 
 
+def comparacion(e):
+    real, estimado = e.get("real_num"), e.get("est_num")
+    if real is None or estimado is None:
+        return ""
+    if real > estimado:
+        return " ▲ sobre lo estimado"
+    if real < estimado:
+        return " ▼ bajo lo estimado"
+    return " = en línea"
+
+
+def mensaje_publicado(fecha, eventos):
+    lineas = [f"📊 <b>Publicado — dato macro EE. UU. de las {fecha:%H:%M}</b>", ""]
+    lineas += [linea_evento(e) + comparacion(e) for e in eventos if e.get("real")]
+    return "\n".join(lineas)
+
+
+def es_discurso(grupo):
+    # Los discursos y conferencias no tienen cifras: no hay dato real que esperar.
+    return all(e["anterior"] == "—" and e["estimado"] == "—" for e in grupo)
+
+
 def procesar_calendario(eventos, estado, args):
-    """Envía los avisos que caen antes de la próxima corrida, esperando si hace falta."""
+    """Avisa 10 min antes de cada dato y manda el dato real apenas se publica.
+
+    Cubre lo que pasa antes de la próxima corrida, esperando si hace falta, más
+    los datos publicados desde la corrida anterior cuyo valor real aún no se envió.
+    """
     horizonte = ahora() + timedelta(minutes=config.HORIZONTE_MINUTOS)
-    pendientes = []
+    tareas = []
     for fecha, grupo in agrupar_por_hora(eventos):
         clave = fecha.isoformat()
         aviso = fecha - timedelta(minutes=config.MINUTOS_ANTES)
-        if clave in estado["avisados"] or fecha <= ahora() or aviso > horizonte:
-            continue
-        pendientes.append((aviso, fecha, grupo))
+        if fecha > ahora() and aviso <= horizonte:
+            if clave not in estado["avisados"]:
+                tareas.append((aviso, "aviso", fecha, grupo))
+            if clave not in estado["publicados"] and not es_discurso(grupo):
+                tareas.append((fecha + timedelta(minutes=config.MINUTOS_DESPUES), "publicado", fecha, grupo))
+        elif (ahora() - timedelta(minutes=90) <= fecha <= ahora() and clave not in estado["publicados"]
+              and not es_discurso(grupo)):
+            tareas.append((ahora(), "publicado", fecha, grupo))
 
-    if not pendientes:
+    if not tareas:
         log("Calendario: no hay datos macro antes de la próxima corrida.")
         return
 
-    for aviso, fecha, grupo in pendientes:
-        espera = (aviso - ahora()).total_seconds()
+    for momento, tipo, fecha, grupo in sorted(tareas, key=lambda t: t[0]):
+        espera = (momento - ahora()).total_seconds()
         if espera > 0:
             if args.sin_espera:
-                log(f"Calendario: (sin espera) el aviso real saldría a las {aviso:%H:%M}.")
+                log(f"Calendario: (sin espera) el mensaje '{tipo}' saldría a las {momento:%H:%M}.")
             else:
-                log(f"Calendario: esperando hasta las {aviso:%H:%M} para avisar del dato de las {fecha:%H:%M}...")
+                log(f"Calendario: esperando hasta las {momento:%H:%M} ({tipo} del dato de las {fecha:%H:%M})...")
                 time.sleep(espera)
-        enviar_telegram(mensaje_aviso(fecha, grupo), args.dry_run)
-        estado["avisados"][fecha.isoformat()] = ahora().isoformat()
+                if tipo == "publicado":
+                    try:  # se vuelve a leer el calendario para traer el dato recién publicado
+                        grupo = [e for e in leer_calendario() if e["fecha"] == fecha] or grupo
+                    except Exception as e:
+                        log(f"AVISO: no se pudo releer el calendario ({e}).")
+
+        if tipo == "aviso":
+            enviar_telegram(mensaje_aviso(fecha, grupo), args.dry_run)
+            estado["avisados"][fecha.isoformat()] = ahora().isoformat()
+            log(f"Calendario: aviso enviado ({len(grupo)} indicador/es de las {fecha:%H:%M}).")
+        elif any(e.get("real") for e in grupo):
+            enviar_telegram(mensaje_publicado(fecha, grupo), args.dry_run)
+            estado["publicados"][fecha.isoformat()] = ahora().isoformat()
+            log(f"Calendario: dato real enviado (indicadores de las {fecha:%H:%M}).")
+        else:
+            log(f"Calendario: el dato de las {fecha:%H:%M} aún no aparece; se reintenta en la próxima corrida.")
         guardar_estado(estado, args.dry_run)
-        log(f"Calendario: aviso enviado ({len(grupo)} indicador/es de las {fecha:%H:%M}).")
 
 
 def agenda_de_hoy(eventos):
@@ -412,6 +460,10 @@ def hacer_resumen(estado, eventos, error_calendario, args):
         partes[0] += "\n<i>Incluye el fin de semana</i>"
     partes.append(f"📅 <b>Agenda macro</b>\n⚠️ No se pudo leer el calendario ({html.escape(error_calendario)})."
                   if error_calendario else agenda_de_hoy(eventos))
+    # Los datos reales que ya van en la agenda no se repiten en un mensaje aparte.
+    for fecha, grupo in agrupar_por_hora(eventos):
+        if fecha <= ahora() and any(e.get("real") for e in grupo):
+            estado["publicados"][fecha.isoformat()] = ahora().isoformat()
 
     seleccion = []
     if noticias:
