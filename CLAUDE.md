@@ -17,5 +17,5 @@ Python local: `.venv` (3.14). Pruebas: `bot/main.py --dry-run --sin-espera [--mo
 
 ## Estado
 - [x] Código y workflow, probados en dry-run (resumen, urgentes, espera del calendario, Gemini simulado)
-- [ ] El usuario crea la API key de Gemini, el repositorio de GitHub (público o privado) y los 3 secrets
+- [x] Repo github.com/panchez87-ui/noticias con los 3 secrets; corrida #3 OK el 2026-10-15 (bot @Alertas_wti_bot, renombrado «Noticias»)
 - [ ] Primera corrida real y ajuste del criterio de urgentes / del volumen de mensajes
