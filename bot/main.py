@@ -329,8 +329,12 @@ def lista_numerada(noticias):
     lineas = []
     for i, n in enumerate(noticias):
         cuando = n["fecha"].astimezone(config.ZONA_LOCAL).strftime("%d/%m %H:%M") if n["fecha"] else "?"
-        lineas.append(f"[{i}] ({config.TEMAS[n['tema']]['etiqueta']}) {n['titulo']} — {cuando}")
+        lineas.append(f"[{i}] {n['titulo']} — {cuando}")
     return "\n".join(lineas)
+
+
+def temas_para_prompt():
+    return ", ".join(f'"{k}" ({v["etiqueta"].split(" ", 1)[1]})' for k, v in config.TEMAS.items())
 
 
 # ---------------------------------------------------------------------------
@@ -373,13 +377,25 @@ def elegidas(respuesta, noticias):
             n = noticias[int(item["id"])]
         except (KeyError, ValueError, IndexError, TypeError):
             continue
-        resultado.append((n, str(item.get("resumen", "")).strip(), str(item.get("por_que", "")).strip()))
+        # El tema lo decide la IA leyendo el titular; si no da uno válido, queda el de la búsqueda.
+        tema = item.get("tema") if item.get("tema") in config.TEMAS else n["tema"]
+        resultado.append((n, str(item.get("resumen", "")).strip(), str(item.get("por_que", "")).strip(), tema))
     return resultado
 
 
-def linea_noticia(n, resumen):
-    enlace = f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>'
-    return f"<b>{config.TEMAS[n['tema']]['etiqueta']}</b> — {html.escape(resumen)} ({enlace})"
+def bloques_por_tema(seleccion):
+    """Agrupa las noticias elegidas por tema, en el orden de config.TEMAS."""
+    bloques = []
+    for tema, cfg in config.TEMAS.items():
+        lineas = []
+        for n, resumen, _, t in seleccion:
+            if t != tema:
+                continue
+            enlace = f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>'
+            lineas.append(f"• {html.escape(resumen)} ({enlace})")
+        if lineas:
+            bloques.append(f"<b>{cfg['etiqueta']}</b>\n" + "\n\n".join(lineas))
+    return "\n\n".join(bloques)
 
 
 def hacer_resumen(estado, eventos, error_calendario, args):
@@ -404,18 +420,20 @@ hay titulares de las últimas {horas} horas, numerados. Elige como MÁXIMO
 {config.MAX_NOTICIAS_RESUMEN} noticias, las más importantes para los mercados de petróleo, gas
 natural, centros de datos, IA, oro, maíz, litio, dólar y tasas de la Fed. Prioriza hechos
 (decisiones, datos, acuerdos, conflictos, cifras) sobre análisis u opinión. Si varias
-noticias tratan el mismo hecho, elige solo una. Ordénalas de más a menos importante.
+noticias tratan el mismo hecho, elige solo una.
 
-Para cada una escribe en español un "resumen" de 1 o 2 frases: qué pasó y por qué importa
-para el mercado. No des recomendaciones de inversión.
+Para cada una indica el "tema" según de qué trata REALMENTE el titular (no adivines por la
+fuente), usando una de estas claves: {temas_para_prompt()}. Si un titular no encaja en
+ninguno de esos temas, no lo elijas. Escribe también en español un "resumen" de 1 o 2
+frases: qué pasó y por qué importa para el mercado. No des recomendaciones de inversión.
 
-Responde solo con JSON: {{"noticias": [{{"id": <número>, "resumen": "<texto>"}}]}}
+Responde solo con JSON: {{"noticias": [{{"id": <número>, "tema": "<clave>", "resumen": "<texto>"}}]}}
 
 Titulares:
 {lista_numerada(noticias)}"""
         if args.dry_run and not os.environ.get("GEMINI_API_KEY"):
             log("Sin GEMINI_API_KEY en dry-run: se muestran los primeros titulares sin filtrar.")
-            seleccion = [(n, n["titulo"], "") for n in noticias[:config.MAX_NOTICIAS_RESUMEN]]
+            seleccion = [(n, n["titulo"], "", n["tema"]) for n in noticias[:config.MAX_NOTICIAS_RESUMEN]]
         else:
             try:
                 seleccion = elegidas(preguntar_gemini(prompt), noticias)[:config.MAX_NOTICIAS_RESUMEN]
@@ -426,7 +444,7 @@ Titulares:
                               "o los logs en Actions.</i>")
 
     if seleccion:
-        partes.append("📰 <b>Lo más importante</b>\n\n" + "\n\n".join(linea_noticia(n, r) for n, r, _ in seleccion))
+        partes.append("📰 <b>Lo más importante</b>\n\n" + bloques_por_tema(seleccion))
     else:
         partes.append("📰 Sin noticias destacadas.")
 
@@ -455,11 +473,12 @@ criterio:
 Tampoco elijas nada que repita un hecho ya alertado hoy:
 {ya_enviadas}
 
-Lo normal es que la lista quede vacía. Si eliges alguno, escribe en español un "resumen" (qué
-pasó, 1 frase) y "por_que" (por qué mueve el mercado, 1 frase). Máximo 3. No des
+Lo normal es que la lista quede vacía. Si eliges alguno, indica su "tema" según de qué trata
+realmente, con una de estas claves: {temas_para_prompt()}; y escribe en español un "resumen"
+(qué pasó, 1 frase) y "por_que" (por qué mueve el mercado, 1 frase). Máximo 3. No des
 recomendaciones de inversión.
 
-Responde solo con JSON: {{"noticias": [{{"id": <número>, "resumen": "<texto>", "por_que": "<texto>"}}]}}
+Responde solo con JSON: {{"noticias": [{{"id": <número>, "tema": "<clave>", "resumen": "<texto>", "por_que": "<texto>"}}]}}
 
 Titulares:
 {lista_numerada(nuevas)}"""
@@ -470,8 +489,8 @@ Titulares:
     else:
         seleccion = elegidas(preguntar_gemini(prompt), nuevas)[:3]
 
-    for n, resumen, por_que in seleccion:
-        texto = (f"🚨 <b>Urgente — {config.TEMAS[n['tema']]['etiqueta']}</b>\n\n{html.escape(resumen)}\n\n"
+    for n, resumen, por_que, tema in seleccion:
+        texto = (f"🚨 <b>Urgente — {config.TEMAS[tema]['etiqueta']}</b>\n\n{html.escape(resumen)}\n\n"
                  f"<i>Por qué importa:</i> {html.escape(por_que)}\n\n"
                  f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>')
         enviar_telegram(texto, args.dry_run)

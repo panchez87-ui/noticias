@@ -116,17 +116,20 @@ NOMBRES_INDICADORES = {
 # ---------------------------------------------------------------------------
 # Noticias. Cada tema se busca en Google News (agrega Reuters, WSJ, CNBC,
 # Bloomberg, etc.); además hay algunos feeds directos asignados a un tema.
+# El orden de esta lista es el orden de los bloques en el resumen. El tema
+# final de cada noticia lo asigna Gemini leyendo el titular (la búsqueda que
+# la encontró a veces no coincide con su contenido).
 # ---------------------------------------------------------------------------
 TEMAS = {
+    "fed": {"etiqueta": "🏦 Fed y tasas", "busqueda": '"Federal Reserve" OR FOMC OR "Fed chair"'},
     "petroleo": {"etiqueta": "🛢 Petróleo", "busqueda": 'crude oil OR OPEC OR Brent OR WTI'},
     "gas": {"etiqueta": "🔥 Gas natural", "busqueda": '"natural gas" OR LNG OR "Henry Hub"'},
-    "datacenters": {"etiqueta": "🏢 Centros de datos", "busqueda": '"data center" OR "data centers" OR hyperscaler'},
-    "ia": {"etiqueta": "🤖 Inteligencia artificial", "busqueda": '"artificial intelligence" OR OpenAI OR Nvidia OR Anthropic'},
+    "dolar": {"etiqueta": "💵 Dólar", "busqueda": '"dollar index" OR "U.S. dollar" OR DXY'},
     "oro": {"etiqueta": "🥇 Oro", "busqueda": '"gold price" OR "gold prices" OR bullion'},
     "maiz": {"etiqueta": "🌽 Maíz", "busqueda": 'corn futures OR "corn prices" OR WASDE OR "USDA corn"'},
     "litio": {"etiqueta": "🔋 Litio", "busqueda": 'lithium'},
-    "dolar": {"etiqueta": "💵 Dólar", "busqueda": '"dollar index" OR "U.S. dollar" OR DXY'},
-    "fed": {"etiqueta": "🏦 Fed y tasas", "busqueda": '"Federal Reserve" OR FOMC OR "Fed chair"'},
+    "datacenters": {"etiqueta": "🏢 Centros de datos", "busqueda": '"data center" OR "data centers" OR hyperscaler'},
+    "ia": {"etiqueta": "🤖 Inteligencia artificial", "busqueda": '"artificial intelligence" OR OpenAI OR Nvidia OR Anthropic'},
 }
 
 # Las búsquedas de Google News se limitan a estos medios (sin esta lista
