@@ -12,6 +12,7 @@ Requisitos del usuario (2026-10-15):
 Decisiones:
 - Investing.com da 403 (bloquea bots). Calendario: TradingView (economic-calendar.tradingview.com, con dato real; requiere header Origin) y ForexFactory como respaldo (sin dato real).
 - Noticias: Google News RSS limitado a `MEDIOS_CONFIABLES` (site:), más feeds directos.
+- GitHub se saltó la mayoría de las corridas programadas del 15 y 16-oct (cron en :00). Desde el 2026-10-16 el cron va en :07 como respaldo y el disparador principal es cron-job.org (POST `workflow_dispatch` a la hora exacta, token fine-grained con solo Actions R/W sobre `noticias`, guardado en cron-job.org, no en el repo).
 - Gemini asigna el tema de cada noticia leyendo el titular; la búsqueda que la encontró a veces no coincide.
 - Gemini en tier gratuito: `gemini-3.8-flash` y, como respaldo, `gemini-3.5-flash-lite` (verificado el 2026-10-15). Si Gemini falla, el resumen se envía igual con la agenda macro.
 
@@ -21,5 +22,7 @@ Los archivos usan CRLF en Windows (core.autocrlf=true): editar con la herramient
 ## Estado
 - [x] Código y workflow probados en dry-run y en Actions (corridas #3 a #5 OK el 2026-10-15)
 - [x] Medios confiables, bloques por tema, dato real del calendario y mensaje de dato publicado
+- [x] Cron movido a :07 (2026-10-16)
+- [ ] Configurar cron-job.org y verificar que aparezcan corridas `workflow_dispatch` puntuales
 - [ ] Ver el primer aviso y el primer dato real en un día con datos (la semana del 19-oct)
 - [ ] Ajustar el criterio de urgentes y el volumen de mensajes tras una semana de uso
