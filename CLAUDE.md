@@ -25,6 +25,6 @@ Los archivos usan CRLF en Windows (core.autocrlf=true): editar con la herramient
 - [x] Medios confiables, bloques por tema, dato real del calendario y mensaje de dato publicado
 - [x] Cron movido a :07 (2026-10-16)
 - [x] `bot/local.py` + respaldo de GitHub + `instalar_tarea.ps1` (2026-10-16)
-- [ ] El usuario llena `.env` y ejecuta `instalar_tarea.ps1`; verificar `logs/local.log` y los commits «estado del bot (PC)»
+- [x] Tarea instalada y primera corrida desde la PC OK (resumen enviado el 2026-10-16 9:51)
 - [ ] Ver el primer aviso y el primer dato real en un día con datos (la semana del 19-oct)
 - [ ] Ajustar el criterio de urgentes y el volumen de mensajes tras una semana de uso
