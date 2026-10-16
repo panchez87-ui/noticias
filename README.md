@@ -36,8 +36,18 @@ Cada corrida dura aproximadamente 1 minuto. Si hay un dato macro antes de la sig
 
 `--dry-run` imprime los mensajes en lugar de enviarlos y no guarda estado. Sin `GEMINI_API_KEY`, el resumen muestra los titulares sin filtrar.
 
+## Correr desde la PC (motor principal)
+
+GitHub retrasa o se salta muchas corridas programadas, así que en horario laboral el bot corre desde la PC con el Programador de tareas de Windows (`bot/local.py`). GitHub queda de respaldo para cuando la PC está apagada: si la PC corrió hace menos de 90 minutos, sus corridas programadas no hacen nada. Las dos comparten `data/state.json` vía git, así que no se repiten mensajes.
+
+Instalación (una sola vez):
+1. Completar `.env` en la raíz (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY`). No se sube al repo.
+2. `powershell -ExecutionPolicy Bypass -File instalar_tarea.ps1`
+
+La tarea corre cada hora de 7:00 a 22:00, al iniciar sesión y al desbloquear la PC; `local.py` sale sin hacer nada los fines de semana, fuera de horario o si ya corrió en esa hora. Registro: `logs/local.log`.
+
 ## Limitaciones
 
-- GitHub puede retrasar las corridas programadas, en momentos de mucha carga hasta 15-30 minutos. Si la corrida de las 7:00 arranca tarde, el aviso de las 7:20 (datos de las 8:30 ET mientras rija el horario de verano de EE. UU.) sale tarde o justo a la hora del dato. Si esto pasa seguido, se puede disparar el workflow desde cron-job.org, que es puntual y gratuito.
+- GitHub puede retrasar las corridas programadas o saltárselas. Mientras la PC esté apagada, los avisos dependen de él.
 - El calendario de TradingView no es una API oficial: si deja de funcionar, el bot pasa solo a ForexFactory (sin dato real).
 - GitHub desactiva los workflows programados tras 60 días sin actividad. Los commits de estado que hace el propio bot cuentan como actividad.

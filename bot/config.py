@@ -13,6 +13,9 @@ ZONA_LOCAL = timezone(timedelta(hours=-5))
 # 7 a 22, de lunes a viernes; aquí se decide qué hace cada corrida.
 # ---------------------------------------------------------------------------
 HORA_RESUMEN = 8  # la primera corrida desde las 8:00 manda el resumen del día
+# Si la PC (bot/local.py) corrió hace menos de esto, las corridas programadas
+# de GitHub no hacen nada: la PC es el motor principal y GitHub el respaldo.
+MINUTOS_PC_ACTIVA = 90
 
 # ---------------------------------------------------------------------------
 # Calendario económico. Fuente principal: TradingView (trae el dato real

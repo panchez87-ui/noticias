@@ -77,6 +77,12 @@ def cargar_estado():
     return estado
 
 
+def pc_activa(estado):
+    """La PC corrió hace poco (bot/local.py): GitHub queda solo de respaldo."""
+    ultima = estado.get("ultima_corrida_pc")
+    return bool(ultima) and ahora() - datetime.fromisoformat(ultima) < timedelta(minutes=config.MINUTOS_PC_ACTIVA)
+
+
 def guardar_estado(estado, dry_run):
     if dry_run:
         return
@@ -574,6 +580,10 @@ def main():
 
     estado = cargar_estado()
     hoy = ahora().date().isoformat()
+
+    if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and pc_activa(estado):
+        log("La PC está corriendo el bot; esta corrida de GitHub no hace nada.")
+        return
 
     eventos, error_calendario = [], None
     try:
