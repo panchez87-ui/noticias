@@ -3,12 +3,14 @@ name: Bot macro y noticias
 # Cada hora de 7:00 a 22:00 hora de Ecuador (UTC-5 todo el año), lunes a viernes:
 #   7:00-18:00 Ecuador  = 12:00-23:00 UTC de lunes a viernes
 #   19:00-22:00 Ecuador = 00:00-03:00 UTC del día siguiente (martes a sábado)
-# GitHub puede retrasar unos minutos las corridas programadas; el bot lo
-# compensa mirando 75 minutos hacia adelante en el calendario.
+# GitHub retrasa o se salta corridas programadas cuando hay carga, sobre todo
+# en el minuto :00; por eso corre en el :07. El disparador principal es
+# cron-job.org (workflow_dispatch a la hora exacta); este cron es respaldo.
+# El bot mira 75 minutos hacia adelante en el calendario.
 on:
   schedule:
-    - cron: "0 12-23 * * 1-5"
-    - cron: "0 0-3 * * 2-6"
+    - cron: "7 12-23 * * 1-5"
+    - cron: "7 0-3 * * 2-6"
   workflow_dispatch:
     inputs:
       modo:
