@@ -8,12 +8,12 @@ Las dos comparten data/state.json a través del repositorio, así que no se
 repiten mensajes.
 
 Cada corrida:
-  1. Sale sin hacer nada si es fin de semana, fuera de 7-22 h, o si la PC ya
-     corrió en esta misma hora (la tarea se dispara también al iniciar sesión
-     y al desbloquear la PC).
+  1. Sale sin hacer nada si es fin de semana o fuera de 7-22 h.
   2. Trae el estado del repositorio (git pull).
   3. Sale si hay una corrida de GitHub en curso (evita avisos duplicados).
   4. Marca la corrida en el estado y la sube, para que GitHub se quede quieto.
+     Si esta PC u otra ya corrió en esta hora, sale (la tarea se dispara también
+     al iniciar sesión y al desbloquear, y puede haber varias PC instaladas).
   5. Corre bot/main.py y sube el estado final.
 
 Secretos: archivo .env en la raíz del proyecto (no se sube a GitHub).
@@ -34,7 +34,8 @@ import config  # noqa: E402
 RAIZ = Path(__file__).resolve().parent.parent
 ARCHIVO_ESTADO = RAIZ / "data" / "state.json"
 ARCHIVO_LOG = RAIZ / "logs" / "local.log"
-API_CORRIDAS = "https://api.github.com/repos/panchez87-ui/noticias/actions/runs?per_page=10"
+PC = os.environ.get("COMPUTERNAME", "PC")
+API_CORRIDAS ="https://api.github.com/repos/panchez87-ui/noticias/actions/runs?per_page=10"
 
 
 def log(msg):
@@ -86,6 +87,29 @@ def github_corriendo():
     return any(c["status"] in ("queued", "in_progress", "waiting", "pending") for c in corridas)
 
 
+def tomar_turno(ahora):
+    """Marca la corrida en el estado y la sube. El push hace de candado entre
+    varias PC: si otra subió antes, se trae su estado y se vuelve a mirar.
+    Devuelve False si alguna PC ya corrió en esta hora."""
+    for _ in range(3):
+        estado = json.loads(ARCHIVO_ESTADO.read_text(encoding="utf-8")) if ARCHIVO_ESTADO.exists() else {}
+        ultima = estado.get("ultima_corrida_pc")
+        if ultima and datetime.fromisoformat(ultima).strftime("%Y-%m-%d %H") == ahora.strftime("%Y-%m-%d %H"):
+            return False
+        estado["ultima_corrida_pc"] = ahora.isoformat()
+        estado["ultima_pc"] = PC
+        ARCHIVO_ESTADO.write_text(json.dumps(estado, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+        git("add", "data/state.json")
+        git("commit", "-q", "-m", f"estado del bot ({PC}) [skip ci]")
+        try:
+            git("push", "-q")
+            return True
+        except RuntimeError:
+            git("reset", "-q", "--keep", "HEAD~1")
+            git("pull", "-q", "--rebase", "--autostash")
+    raise RuntimeError("no se pudo subir la marca de corrida tras 3 intentos")
+
+
 def main():
     ahora = datetime.now(config.ZONA_LOCAL)
     if ahora.weekday() >= 5 or not 7 <= ahora.hour <= 22:
@@ -93,10 +117,6 @@ def main():
 
     cargar_env()
     git("pull", "-q", "--rebase", "--autostash")
-    estado = json.loads(ARCHIVO_ESTADO.read_text(encoding="utf-8")) if ARCHIVO_ESTADO.exists() else {}
-    ultima = estado.get("ultima_corrida_pc")
-    if ultima and datetime.fromisoformat(ultima).strftime("%Y-%m-%d %H") == ahora.strftime("%Y-%m-%d %H"):
-        return  # ya corrió en esta hora
 
     try:
         if github_corriendo():
@@ -105,9 +125,8 @@ def main():
     except Exception as e:
         log(f"AVISO: no se pudo consultar GitHub ({e}); se sigue.")
 
-    estado["ultima_corrida_pc"] = ahora.isoformat()
-    ARCHIVO_ESTADO.write_text(json.dumps(estado, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
-    subir_estado("estado del bot (PC)")
+    if not tomar_turno(ahora):
+        return  # esta PC u otra ya corrió en esta hora
 
     log("Corriendo bot/main.py")
     python = Path(sys.executable).with_name("python.exe")  # pythonw no tiene consola para la salida
@@ -116,7 +135,7 @@ def main():
                            stderr=subprocess.STDOUT, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     log(f"main.py terminó con código {r.returncode}")
-    subir_estado("estado del bot (PC)")
+    subir_estado(f"estado del bot ({PC})")
 
 
 if __name__ == "__main__":

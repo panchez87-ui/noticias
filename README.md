@@ -40,9 +40,13 @@ Cada corrida dura aproximadamente 1 minuto. Si hay un dato macro antes de la sig
 
 GitHub retrasa o se salta muchas corridas programadas, así que en horario laboral el bot corre desde la PC con el Programador de tareas de Windows (`bot/local.py`). GitHub queda de respaldo para cuando la PC está apagada: si la PC corrió hace menos de 90 minutos, sus corridas programadas no hacen nada. Las dos comparten `data/state.json` vía git, así que no se repiten mensajes.
 
-Instalación (una sola vez):
-1. Completar `.env` en la raíz (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY`). No se sube al repo.
-2. `powershell -ExecutionPolicy Bypass -File instalar_tarea.ps1`
+Instalación en una PC (requiere Git y Python 3.12 o más nuevo):
+```powershell
+git clone https://github.com/panchez87-ui/noticias.git bot-noticias-macro
+cd bot-noticias-macro
+powershell -ExecutionPolicy Bypass -File instalar.ps1
+```
+`instalar.ps1` crea `.venv`, instala las dependencias, abre `.env` para pegar los secretos (no se sube al repo) y registra la tarea. Se pueden instalar varias PC: la que primero sube su marca de corrida en una hora es la que corre; las demás se quedan quietas.
 
 La tarea corre cada hora de 7:00 a 22:00, al iniciar sesión y al desbloquear la PC; `local.py` sale sin hacer nada los fines de semana, fuera de horario o si ya corrió en esa hora. Registro: `logs/local.log`.
 
