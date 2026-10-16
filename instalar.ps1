@@ -5,7 +5,8 @@
 #   1. Crea el entorno de Python (.venv) e instala las dependencias.
 #   2. Crea .env a partir de .env.example y lo abre en el Bloc de notas para
 #      pegar los secretos.
-#   3. Registra la tarea «Bot noticias macro» del Programador de tareas: corre
+#   3. Comprueba que Git pueda subir al repositorio (pide iniciar sesión en GitHub).
+#   4. Registra la tarea «Bot noticias macro» del Programador de tareas: corre
 #      bot/local.py cada hora de 7:00 a 22:00, al iniciar sesión y al
 #      desbloquear la PC (local.py decide si hay algo que hacer).
 #
@@ -31,7 +32,17 @@ if (-not (Test-Path "$raiz\.env")) {
     Start-Process notepad "$raiz\.env" -Wait
 }
 
-# 3. Tarea programada
+# 3. Git: identidad para los commits de estado y sesión de GitHub para subirlos.
+# La tarea corre oculta y no puede pedir el inicio de sesión, así que se pide aquí.
+if (-not (git -C $raiz config user.email)) {
+    git -C $raiz config user.name "bot-macro"
+    git -C $raiz config user.email "actions@users.noreply.github.com"
+}
+Write-Host "Comprobando el acceso a GitHub (si se abre el navegador, inicia sesión con tu cuenta)..."
+git -C $raiz push --dry-run
+if ($LASTEXITCODE -ne 0) { throw "Git no puede subir al repositorio; revisa el inicio de sesión en GitHub." }
+
+# 4. Tarea programada
 $accion = New-ScheduledTaskAction -Execute "$raiz\.venv\Scripts\pythonw.exe" -Argument "`"$raiz\bot\local.py`"" -WorkingDirectory $raiz
 
 $diaria = New-ScheduledTaskTrigger -Daily -At 7:00
