@@ -154,8 +154,7 @@ FEEDS_DIRECTOS = [
 ]
 
 MAX_TITULARES_POR_TEMA = 30   # para el resumen de la mañana
-NOTICIAS_POR_TEMA_MIN = 2     # cada bloque del resumen lleva entre MIN y MAX noticias
-NOTICIAS_POR_TEMA_MAX = 3     # (menos si ese día no hay suficientes relevantes)
+NOTICIAS_POR_TEMA_MAX = 2     # cada bloque lleva 1 noticia; la 2.ª solo si es un hecho importante
 HORAS_RESUMEN = 24            # ventana del resumen (martes a viernes)
 HORAS_RESUMEN_LUNES = 72      # el lunes incluye el fin de semana
 DIAS_MEMORIA = 5              # cuántos días se recuerdan noticias y avisos enviados
@@ -165,15 +164,14 @@ DIAS_MEMORIA = 5              # cuántos días se recuerdan noticias y avisos en
 # guerras, protestas...) con fondo económico que se repiten mucho en medios
 # generales, aunque no encajen en TEMAS. Se barre cada medio día por día sin
 # filtro de tema; Gemini agrupa los titulares por historia y aquí se cuentan.
-# Las historias que caen en un bloque de TEMAS no se repiten aquí. Pueden salir
-# varios días seguidos aunque no haya información nueva.
+# Siempre salen las MAX_TENDENCIAS más repetidas que no caen en un bloque de
+# TEMAS ni repiten una noticia ya elegida en el resumen. Pueden salir varios
+# días seguidos aunque no haya información nueva.
 # ---------------------------------------------------------------------------
 MEDIOS_TENDENCIAS = [
     "reuters.com", "bloomberg.com", "cnbc.com", "wsj.com", "ft.com",
     "apnews.com", "bbc.com", "marketwatch.com", "finance.yahoo.com",
 ]
-TENDENCIAS_MIN_TITULARES = 15  # umbral para que una historia cuente como «muy repetida»
-TENDENCIAS_MIN_MEDIOS = 5
 MAX_TENDENCIAS = 3
 # Páginas automáticas (cotizaciones, comunicados, fichas) que no son noticias.
 RUIDO_TENDENCIAS = (r"outperforms|underperforms|company announcement|stock price|quote|profile|\betf\b|"

@@ -6,8 +6,8 @@ Requisitos del usuario (2026-10-15):
 - Prioridad 1: calendario macro de EE. UU. (importancia alta + extras). Aviso 10 minutos antes con estimado y anterior, y mensaje con el dato real unos 3 minutos después de publicado (▲/▼/= frente al estimado).
 - Resumen a las 8:00 con la agenda del día (incluye el dato real de lo ya publicado); el lunes incluye el fin de semana.
 - Noticias agrupadas en bloques en el orden de `TEMAS`: Fed → petróleo → gas → dólar → oro → maíz → litio → centros de datos → IA.
-- Cada bloque lleva 2 o 3 noticias (antes había un tope de 8 en total) — 2026-10-19.
-- «Lo más comentado» (2026-10-19): al final del resumen, hasta 3 historias de cualquier ámbito con fondo económico que se repiten mucho (≥15 titulares y ≥5 medios en la ventana del resumen) y que NO caen en un bloque. Pueden repetirse cada día aunque no haya información nueva. Se barre `MEDIOS_TENDENCIAS` día por día y Gemini agrupa por historia; el conteo lo hace el código. El resultado varía algo entre corridas de Gemini.
+- Cada bloque lleva 1 noticia; una 2.ª solo si es otro hecho importante (2026-10-19; probó 2-3 por bloque y le pareció demasiado: ~27 noticias). Si un tema no tiene nada relevante, el bloque no sale.
+- «Lo más comentado» (2026-10-19): al final del resumen, siempre las 3 historias más repetidas de cualquier ámbito con fondo económico que NO caen en un bloque ni repiten una noticia ya elegida en el resumen. Sin umbral mínimo (antes ≥15 titulares y ≥5 medios; el usuario pidió que sean siempre 3); se muestra el conteo de titulares y medios. Pueden repetirse cada día aunque no haya información nueva. Se barre `MEDIOS_TENDENCIAS` día por día y Gemini agrupa por historia; el conteo lo hace el código. El resultado varía algo entre corridas de Gemini.
 - Fuera del resumen, solo noticias sumamente importantes; si no hay, silencio.
 - Corre cada hora de 7 a 22 h (Ecuador), de lunes a viernes. Costo $0.
 
@@ -31,6 +31,6 @@ Los archivos usan CRLF en Windows (core.autocrlf=true): editar con la herramient
 - [ ] Instalar en la PC personal del usuario
 - [x] Tarea instalada y primera corrida desde la PC OK (resumen enviado el 2026-10-16 9:51)
 - [ ] Ver el primer aviso y el primer dato real en un día con datos (la semana del 19-oct)
-- [x] 2-3 noticias por bloque + «Lo más comentado» (probado en dry-run el 2026-10-19)
+- [x] 1 (o 2) noticias por bloque + «Lo más comentado» con 3 historias (probado en dry-run el 2026-10-19)
 - [ ] Revisar «Lo más comentado» tras unos días (umbral, calidad del fondo económico)
 - [ ] Ajustar el criterio de urgentes y el volumen de mensajes tras una semana de uso

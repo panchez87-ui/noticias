@@ -493,11 +493,13 @@ def recolectar_tendencias(desde):
     return titulares
 
 
-def lo_mas_comentado(titulares):
-    """Las historias con fondo económico más repetidas que no caen en un bloque de TEMAS."""
+def lo_mas_comentado(titulares, seleccion):
+    """Las historias con fondo económico más repetidas que no caen en un bloque de TEMAS
+    ni repiten una de las noticias ya elegidas para el resumen (`seleccion`)."""
     if not titulares:
         return ""
     lista = "\n".join(f"[{i}] {n['titulo']}" for i, n in enumerate(titulares))
+    en_bloques = "\n".join(f"- {resumen}" for _, resumen, _, _ in seleccion) or "(ninguna)"
     prompt = f"""Eres analista de mercados. Abajo hay {len(titulares)} titulares de medios grandes,
 numerados. Agrupa los que cuentan la MISMA historia (el mismo hecho o el mismo conflicto en
 desarrollo, p. ej. "protestas en Francia" o "resultados de los bancos de EE. UU."). Devuelve
@@ -509,10 +511,16 @@ política, sociedad...). Para cada una:
 - "fondo_economico": true solo si tiene un efecto económico claro (mueve mercados, divisas,
   bonos, empresas concretas, commodities, comercio o finanzas públicas); false para sucesos
   políticos, sociales o humanos sin ese efecto;
+- "repite_bloque": true si el hecho central de la historia es el mismo que el de alguna de
+  las noticias de abajo, que ya van en el resumen (no basta con que una de ellas la mencione
+  como causa de otra cosa);
 - "resumen": en español, 1 o 2 frases: qué está pasando y por qué importa en lo económico.
 No des recomendaciones de inversión.
 
-Responde solo con JSON: {{"historias": [{{"ids": [<números>], "tema": "<clave u otro>", "fondo_economico": true, "resumen": "<texto>"}}]}}
+Noticias que ya van en el resumen:
+{en_bloques}
+
+Responde solo con JSON: {{"historias": [{{"ids": [<números>], "tema": "<clave u otro>", "fondo_economico": true, "repite_bloque": false, "resumen": "<texto>"}}]}}
 
 Titulares:
 {lista}"""
@@ -525,17 +533,17 @@ Titulares:
                     ids.add(int(i))
             except (ValueError, TypeError):
                 continue
-        medios = {titulares[i]["medio"] for i in ids}
-        if (h.get("fondo_economico") is not True or h.get("tema") in config.TEMAS
-                or len(ids) < config.TENDENCIAS_MIN_TITULARES or len(medios) < config.TENDENCIAS_MIN_MEDIOS):
+        if (not ids or h.get("fondo_economico") is not True or h.get("tema") in config.TEMAS
+                or h.get("repite_bloque") is True):
             continue
+        medios = {titulares[i]["medio"] for i in ids}
         historias.append((len(ids), len(medios), str(h.get("resumen", "")).strip(), titulares[min(ids)]))
     historias.sort(key=lambda x: x[0], reverse=True)
     lineas = []
     for n_titulares, n_medios, resumen, n in historias[:config.MAX_TENDENCIAS]:
         enlace = f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>'
         lineas.append(f"• {html.escape(resumen)} <i>({n_titulares} titulares en {n_medios} medios)</i> ({enlace})")
-    log(f"Lo más comentado: {len(historias)} historias pasan el umbral; se muestran {len(lineas)}.")
+    log(f"Lo más comentado: {len(historias)} historias candidatas; se muestran {len(lineas)}.")
     return "\n\n".join(lineas)
 
 
@@ -562,13 +570,12 @@ def hacer_resumen(estado, eventos, error_calendario, args):
     if noticias:
         prompt = f"""Eres el editor de un analista junior de commodities y macro en Ecuador. Abajo
 hay titulares de las últimas {horas} horas, numerados. Para CADA tema (petróleo, gas natural,
-centros de datos, IA, oro, maíz, litio, dólar y tasas de la Fed) elige entre
-{config.NOTICIAS_POR_TEMA_MIN} y {config.NOTICIAS_POR_TEMA_MAX} noticias, las más importantes para
-ese mercado; si un tema no tiene suficientes noticias relevantes, elige solo las que haya:
-es mejor un bloque corto que uno con relleno (páginas de cotizaciones o titulares sin un hecho
-concreto no cuentan). Prioriza hechos (decisiones, datos, acuerdos, conflictos, cifras) sobre
-análisis u opinión.
-Si varias noticias tratan el mismo hecho, elige solo una.
+centros de datos, IA, oro, maíz, litio, dólar y tasas de la Fed) elige UNA noticia: la más
+importante para ese mercado. Agrega una segunda solo si es otro hecho importante (una decisión,
+un dato, un acuerdo o un conflicto que mueva ese mercado), no otro ángulo del mismo hecho ni
+un movimiento de precio normal. Si un tema no tiene ninguna noticia relevante, no elijas nada
+para él: páginas de cotizaciones o titulares sin un hecho concreto no cuentan. Prioriza hechos
+sobre análisis u opinión.
 
 Para cada una indica el "tema" según de qué trata REALMENTE el titular (no adivines por la
 fuente), usando una de estas claves: {temas_para_prompt()}. Si un titular no encaja en
@@ -600,7 +607,7 @@ Titulares:
         log("Sin GEMINI_API_KEY en dry-run: no se calcula «Lo más comentado».")
     else:
         try:
-            comentado = lo_mas_comentado(recolectar_tendencias(desde))
+            comentado = lo_mas_comentado(recolectar_tendencias(desde), seleccion)
             if comentado:
                 partes.append("🔥 <b>Lo más comentado</b>\n\n" + comentado)
         except Exception as e:
