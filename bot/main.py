@@ -452,6 +452,93 @@ def bloques_por_tema(seleccion):
     return "\n\n".join(bloques)
 
 
+def limitar_por_tema(seleccion):
+    """Deja como máximo NOTICIAS_POR_TEMA_MAX noticias en cada bloque."""
+    cuenta, resultado = {}, []
+    for item in seleccion:
+        cuenta[item[3]] = cuenta.get(item[3], 0) + 1
+        if cuenta[item[3]] <= config.NOTICIAS_POR_TEMA_MAX:
+            resultado.append(item)
+    return resultado
+
+
+def recolectar_tendencias(desde):
+    """Titulares de MEDIOS_TENDENCIAS publicados desde `desde`, sin filtro de tema.
+
+    Se pide cada medio día por día: Google News devuelve como máximo 100
+    titulares por búsqueda, y así el conteo no depende de la ventana."""
+    ruido = re.compile(config.RUIDO_TENDENCIAS, re.I)
+    titulares, claves = [], set()
+    dia, hasta = desde.astimezone(config.ZONA_LOCAL).date(), ahora().date()
+    while dia <= hasta:
+        for medio in config.MEDIOS_TENDENCIAS:
+            q = urllib.parse.quote(f"site:{medio} after:{dia} before:{dia + timedelta(days=1)}")
+            url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+            for entrada in leer_feed(url, f"Google News / {medio}"):
+                titulo = (entrada.get("title") or "").strip()
+                link = entrada.get("link") or ""
+                if not titulo or not link or ruido.search(titulo):
+                    continue
+                if entrada.get("published_parsed"):
+                    if datetime(*entrada.published_parsed[:6], tzinfo=timezone.utc) < desde:
+                        continue
+                clave = clave_titular(titulo)
+                if clave in claves:
+                    continue
+                claves.add(clave)
+                titulares.append({"titulo": titulo, "link": link, "medio": medio,
+                                  "fuente": (entrada.get("source") or {}).get("title") or medio})
+        dia += timedelta(days=1)
+    log(f"Lo más comentado: {len(titulares)} titulares de medios generales.")
+    return titulares
+
+
+def lo_mas_comentado(titulares):
+    """Las historias con fondo económico más repetidas que no caen en un bloque de TEMAS."""
+    if not titulares:
+        return ""
+    lista = "\n".join(f"[{i}] {n['titulo']}" for i, n in enumerate(titulares))
+    prompt = f"""Eres analista de mercados. Abajo hay {len(titulares)} titulares de medios grandes,
+numerados. Agrupa los que cuentan la MISMA historia (el mismo hecho o el mismo conflicto en
+desarrollo, p. ej. "protestas en Francia" o "resultados de los bancos de EE. UU."). Devuelve
+las 20 historias con MÁS titulares, de cualquier ámbito (empresas, geopolítica, guerras,
+política, sociedad...). Para cada una:
+- "ids": la lista COMPLETA de los números de sus titulares;
+- "tema": si la historia trata directamente de uno de estos temas, su clave:
+  {temas_para_prompt()}; si no, "otro";
+- "fondo_economico": true solo si tiene un efecto económico claro (mueve mercados, divisas,
+  bonos, empresas concretas, commodities, comercio o finanzas públicas); false para sucesos
+  políticos, sociales o humanos sin ese efecto;
+- "resumen": en español, 1 o 2 frases: qué está pasando y por qué importa en lo económico.
+No des recomendaciones de inversión.
+
+Responde solo con JSON: {{"historias": [{{"ids": [<números>], "tema": "<clave u otro>", "fondo_economico": true, "resumen": "<texto>"}}]}}
+
+Titulares:
+{lista}"""
+    historias = []
+    for h in preguntar_gemini(prompt).get("historias", []):
+        ids = set()
+        for i in h.get("ids", []):
+            try:
+                if 0 <= int(i) < len(titulares):
+                    ids.add(int(i))
+            except (ValueError, TypeError):
+                continue
+        medios = {titulares[i]["medio"] for i in ids}
+        if (h.get("fondo_economico") is not True or h.get("tema") in config.TEMAS
+                or len(ids) < config.TENDENCIAS_MIN_TITULARES or len(medios) < config.TENDENCIAS_MIN_MEDIOS):
+            continue
+        historias.append((len(ids), len(medios), str(h.get("resumen", "")).strip(), titulares[min(ids)]))
+    historias.sort(key=lambda x: x[0], reverse=True)
+    lineas = []
+    for n_titulares, n_medios, resumen, n in historias[:config.MAX_TENDENCIAS]:
+        enlace = f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>'
+        lineas.append(f"• {html.escape(resumen)} <i>({n_titulares} titulares en {n_medios} medios)</i> ({enlace})")
+    log(f"Lo más comentado: {len(historias)} historias pasan el umbral; se muestran {len(lineas)}.")
+    return "\n\n".join(lineas)
+
+
 def hacer_resumen(estado, eventos, error_calendario, args):
     es_lunes = ahora().weekday() == 0
     horas = config.HORAS_RESUMEN_LUNES if es_lunes else config.HORAS_RESUMEN
@@ -474,11 +561,14 @@ def hacer_resumen(estado, eventos, error_calendario, args):
     seleccion = []
     if noticias:
         prompt = f"""Eres el editor de un analista junior de commodities y macro en Ecuador. Abajo
-hay titulares de las últimas {horas} horas, numerados. Elige como MÁXIMO
-{config.MAX_NOTICIAS_RESUMEN} noticias, las más importantes para los mercados de petróleo, gas
-natural, centros de datos, IA, oro, maíz, litio, dólar y tasas de la Fed. Prioriza hechos
-(decisiones, datos, acuerdos, conflictos, cifras) sobre análisis u opinión. Si varias
-noticias tratan el mismo hecho, elige solo una.
+hay titulares de las últimas {horas} horas, numerados. Para CADA tema (petróleo, gas natural,
+centros de datos, IA, oro, maíz, litio, dólar y tasas de la Fed) elige entre
+{config.NOTICIAS_POR_TEMA_MIN} y {config.NOTICIAS_POR_TEMA_MAX} noticias, las más importantes para
+ese mercado; si un tema no tiene suficientes noticias relevantes, elige solo las que haya:
+es mejor un bloque corto que uno con relleno (páginas de cotizaciones o titulares sin un hecho
+concreto no cuentan). Prioriza hechos (decisiones, datos, acuerdos, conflictos, cifras) sobre
+análisis u opinión.
+Si varias noticias tratan el mismo hecho, elige solo una.
 
 Para cada una indica el "tema" según de qué trata REALMENTE el titular (no adivines por la
 fuente), usando una de estas claves: {temas_para_prompt()}. Si un titular no encaja en
@@ -491,10 +581,10 @@ Titulares:
 {lista_numerada(noticias)}"""
         if args.dry_run and not os.environ.get("GEMINI_API_KEY"):
             log("Sin GEMINI_API_KEY en dry-run: se muestran los primeros titulares sin filtrar.")
-            seleccion = [(n, n["titulo"], "", n["tema"]) for n in noticias[:config.MAX_NOTICIAS_RESUMEN]]
+            seleccion = limitar_por_tema([(n, n["titulo"], "", n["tema"]) for n in noticias])
         else:
             try:
-                seleccion = elegidas(preguntar_gemini(prompt), noticias)[:config.MAX_NOTICIAS_RESUMEN]
+                seleccion = limitar_por_tema(elegidas(preguntar_gemini(prompt), noticias))
             except Exception as e:
                 # La agenda macro llega igual aunque la IA falle.
                 log(f"ERROR con Gemini: {e}")
@@ -505,6 +595,17 @@ Titulares:
         partes.append("📰 <b>Lo más importante</b>\n\n" + bloques_por_tema(seleccion))
     else:
         partes.append("📰 Sin noticias destacadas.")
+
+    if args.dry_run and not os.environ.get("GEMINI_API_KEY"):
+        log("Sin GEMINI_API_KEY en dry-run: no se calcula «Lo más comentado».")
+    else:
+        try:
+            comentado = lo_mas_comentado(recolectar_tendencias(desde))
+            if comentado:
+                partes.append("🔥 <b>Lo más comentado</b>\n\n" + comentado)
+        except Exception as e:
+            # Es un extra: si falla, el resumen sale igual.
+            log(f"ERROR en «Lo más comentado»: {e}")
 
     enviar_telegram("\n\n".join(partes), args.dry_run)
     marca = ahora().isoformat()
