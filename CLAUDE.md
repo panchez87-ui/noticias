@@ -13,6 +13,7 @@ Requisitos del usuario (2026-10-15):
 
 Decisiones:
 - Investing.com da 403 (bloquea bots). Calendario: TradingView (economic-calendar.tradingview.com, con dato real; requiere header Origin) y ForexFactory como respaldo (sin dato real).
+- Subastas del Tesoro (2026-10-21): TradingView no cargó el resultado de la de 20 años ni 2 h después, así que el aviso salió pero el dato no. El resultado se toma de TreasuryDirect (`completar_subastas`, API pública TA_WS): rendimiento adjudicado + cobertura (bid-to-cover), y ▲/▼ frente a la subasta anterior porque no hay estimado.
 - Noticias: Google News RSS limitado a `MEDIOS_CONFIABLES` (site:), más feeds directos.
 - GitHub se saltó la mayoría de las corridas programadas del 15 y 16-oct (cron en :00). Desde el 2026-10-16 el motor principal es la PC del usuario (encendida en horario laboral): tarea «Bot noticias macro» del Programador de tareas → `.venv\Scripts\pythonw.exe bot\local.py` cada hora 7-22, al iniciar sesión y al desbloquear. GitHub (cron en :07) queda de respaldo: no hace nada si `ultima_corrida_pc` en state.json tiene menos de `MINUTOS_PC_ACTIVA` (90). El estado se comparte vía git (local.py hace pull/push). Secretos locales en `.env` (gitignored); registro en `logs/local.log`. El usuario descartó cron-job.org, Cloudflare y Supabase.
 - Crear la tarea con Register-ScheduledTask lo bloquea el clasificador de permisos: la registra el usuario con `instalar.ps1` (también crea `.venv` y `.env` desde `.env.example`).

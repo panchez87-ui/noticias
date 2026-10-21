@@ -176,6 +176,7 @@ def leer_calendario_tradingview():
             "real": valor_tv(e, "actual"),
             "real_num": e.get("actual"),
             "est_num": e.get("forecast"),
+            "ant_num": e.get("previous"),
             "estimado": valor_tv(e, "forecast") or "—",
             "anterior": valor_tv(e, "previous") or "—",
         })
@@ -200,10 +201,35 @@ def leer_calendario_forexfactory():
     return eventos
 
 
+def completar_subastas(eventos):
+    """Pone el rendimiento adjudicado (y la cobertura) de las subastas ya cerradas que TradingView no trae."""
+    resultados = {}
+    for e in eventos:
+        if e["titulo"] not in config.SUBASTAS_TESORO or e["real"] or e["fecha"] > ahora():
+            continue
+        tipo, plazo = config.SUBASTAS_TESORO[e["titulo"]]
+        try:
+            if tipo not in resultados:
+                resultados[tipo] = json.loads(http_get(config.SUBASTAS_URL.format(tipo=tipo)))
+        except Exception as error:
+            log(f"AVISO: falló TreasuryDirect ({error}); la subasta queda sin resultado.")
+            return
+        for s in resultados[tipo]:
+            if (s.get("originalSecurityTerm") == plazo and s.get("highYield")
+                    and s.get("inflationProtected") == "No" and s.get("floatingRate") == "No"
+                    and s.get("competitiveAuctionCloseDate", "")[:10] == f"{e['fecha']:%Y-%m-%d}"):
+                e["real_num"] = float(s["highYield"])
+                e["real"] = f"{e['real_num']:g}%"
+                if s.get("bidToCoverRatio"):
+                    e["real"] += f" (cobertura {s['bidToCoverRatio']})"
+                break
+
+
 def leer_calendario():
     """Eventos relevantes, con la hora convertida a Ecuador."""
     try:
         eventos = leer_calendario_tradingview()
+        completar_subastas(eventos)
     except Exception as e:
         log(f"AVISO: falló el calendario de TradingView ({e}); se usa ForexFactory (sin dato real).")
         eventos = leer_calendario_forexfactory()
@@ -231,6 +257,13 @@ def mensaje_aviso(fecha, eventos):
 
 def comparacion(e):
     real, estimado = e.get("real_num"), e.get("est_num")
+    if e["titulo"] in config.SUBASTAS_TESORO and estimado is None:
+        # Las subastas no tienen estimado: se comparan con la subasta anterior.
+        anterior = e.get("ant_num")
+        if real is None or anterior is None:
+            return ""
+        return {1: " ▲ sobre la anterior", -1: " ▼ bajo la anterior", 0: " = igual a la anterior"}[
+            (real > anterior) - (real < anterior)]
     if real is None or estimado is None:
         return ""
     if real > estimado:

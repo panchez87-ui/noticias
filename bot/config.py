@@ -43,7 +43,16 @@ CALENDARIO_EXTRA = [
     "30-Year Bond Auction",
 ]
 
-CALENDARIO_RESPALDO_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+# TradingView tarda horas (o nunca) en cargar el resultado de las subastas: se
+# toma de TreasuryDirect (fuente oficial) con el tipo y plazo original del título.
+SUBASTAS_URL = "https://www.treasurydirect.gov/TA_WS/securities/auctioned?format=json&type={tipo}&days=7"
+SUBASTAS_TESORO = {
+    "10-Year Note Auction": ("Note", "10-Year"),
+    "20-Year Bond Auction": ("Bond", "20-Year"),
+    "30-Year Bond Auction": ("Bond", "30-Year"),
+}
+
+CALENDARIO_RESPALDO_URL ="https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 CALENDARIO_RESPALDO_EXTRA = ["Unemployment Claims", "Flash Manufacturing PMI", "Flash Services PMI",
                              "Crude Oil Inventories", "Natural Gas Storage"]  # ForexFactory no trae las subastas
 MINUTOS_ANTES = 10
