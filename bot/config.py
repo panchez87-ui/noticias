@@ -33,11 +33,19 @@ CALENDARIO_EXTRA = [
     "Core PPI MoM",
     "Retail Sales Ex Autos MoM",
     "Average Hourly Earnings MoM",
-    # "EIA Crude Oil Stocks Change",
+    # Energía (EIA): miércoles el petróleo, jueves el gas natural
+    "EIA Crude Oil Stocks Change",
+    "EIA Gasoline Stocks Change",
+    "EIA Natural Gas Stocks Change",
+    # Subastas del Tesoro (el dato real es el rendimiento adjudicado)
+    "10-Year Note Auction",
+    "20-Year Bond Auction",
+    "30-Year Bond Auction",
 ]
 
 CALENDARIO_RESPALDO_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-CALENDARIO_RESPALDO_EXTRA = ["Unemployment Claims", "Flash Manufacturing PMI", "Flash Services PMI"]
+CALENDARIO_RESPALDO_EXTRA = ["Unemployment Claims", "Flash Manufacturing PMI", "Flash Services PMI",
+                             "Crude Oil Inventories", "Natural Gas Storage"]  # ForexFactory no trae las subastas
 MINUTOS_ANTES = 10
 MINUTOS_DESPUES = 3  # margen para que TradingView cargue el dato real antes de enviarlo
 # Cuánto mira hacia adelante cada corrida. Algo más de 60 min para cubrir los
@@ -79,6 +87,11 @@ NOMBRES_INDICADORES = {
     "Housing Starts": "Inicios de vivienda",
     "Existing Home Sales": "Ventas de viviendas usadas",
     "EIA Crude Oil Stocks Change": "Inventarios de crudo (EIA)",
+    "EIA Gasoline Stocks Change": "Inventarios de gasolina (EIA)",
+    "EIA Natural Gas Stocks Change": "Inventarios de gas natural (EIA)",
+    "10-Year Note Auction": "Subasta de notas del Tesoro a 10 años",
+    "20-Year Bond Auction": "Subasta de bonos del Tesoro a 20 años",
+    "30-Year Bond Auction": "Subasta de bonos del Tesoro a 30 años",
     # ForexFactory (respaldo)
     "CPI m/m": "IPC (inflación general) m/m",
     "CPI y/y": "IPC (inflación general) a/a",

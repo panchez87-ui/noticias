@@ -3,7 +3,7 @@
 Repo público: github.com/panchez87-ui/noticias. Bot de Telegram: @Alertas_wti_bot (renombrado «Noticias»), chat_id 1554570836. Es el único bot de noticias vigente.
 
 Requisitos del usuario (2026-10-15):
-- Prioridad 1: calendario macro de EE. UU. (importancia alta + extras). Aviso 10 minutos antes con estimado y anterior, y mensaje con el dato real unos 3 minutos después de publicado (▲/▼/= frente al estimado).
+- Prioridad 1: calendario macro de EE. UU. (importancia alta + extras). Extras desde el 2026-10-21: inventarios EIA de crudo, gasolina y gas natural, y subastas del Tesoro a 10, 20 y 30 años (en TradingView tienen importancia media/baja y no salían). Aviso 10 minutos antes con estimado y anterior, y mensaje con el dato real unos 3 minutos después de publicado (▲/▼/= frente al estimado).
 - Resumen a las 8:00 con la agenda del día (incluye el dato real de lo ya publicado); el lunes incluye el fin de semana.
 - Noticias agrupadas en bloques en el orden de `TEMAS`: Fed → petróleo → gas → dólar → oro → maíz → litio → centros de datos → IA.
 - Cada bloque lleva 1 noticia; una 2.ª solo si es otro hecho importante (2026-10-19; probó 2-3 por bloque y le pareció demasiado: ~27 noticias). Si un tema no tiene nada relevante, el bloque no sale.
