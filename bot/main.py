@@ -21,6 +21,7 @@ Pruebas locales:
 import argparse
 import hashlib
 import html
+import itertools
 import json
 import os
 import re
@@ -42,6 +43,9 @@ ARCHIVO_ESTADO = RAIZ / "data" / "state.json"
 UA = "Mozilla/5.0 (compatible; BotNoticiasMacro/1.0)"
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+# Hasta cuándo se reintenta Gemini si está saturado (lo fija main; None = un solo intento).
+limite_gemini = None
 
 
 def log(msg):
@@ -438,21 +442,34 @@ def preguntar_gemini(prompt):
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2},
     }).encode("utf-8")
     ultimo_error = None
-    for modelo in config.MODELOS_GEMINI:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-        req = urllib.request.Request(url, data=cuerpo, headers={
-            "Content-Type": "application/json", "x-goog-api-key": clave})
-        try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                respuesta = json.loads(r.read())
-            texto = "".join(p.get("text", "") for p in respuesta["candidates"][0]["content"]["parts"])
-            log(f"Gemini respondió con {modelo}.")
-            return json.loads(texto)
-        except urllib.error.HTTPError as e:
-            ultimo_error = f"{modelo}: HTTP {e.code} {e.read().decode('utf-8', 'replace')[:300]}"
-        except Exception as e:
-            ultimo_error = f"{modelo}: {e}"
-        log(f"AVISO: falló {ultimo_error}; probando el siguiente modelo.")
+    espera = config.MINUTOS_REINTENTO_GEMINI * 60
+    for ronda in itertools.count(1):
+        if ronda > 1:
+            if limite_gemini is None or ahora() + timedelta(seconds=espera) > limite_gemini:
+                log("Gemini sigue saturado y no queda tiempo para otro intento.")
+                break
+            log(f"Gemini saturado; intento {ronda} en {config.MINUTOS_REINTENTO_GEMINI} min.")
+            time.sleep(espera)
+        saturado = False
+        for modelo in config.MODELOS_GEMINI:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+            req = urllib.request.Request(url, data=cuerpo, headers={
+                "Content-Type": "application/json", "x-goog-api-key": clave})
+            try:
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    respuesta = json.loads(r.read())
+                texto = "".join(p.get("text", "") for p in respuesta["candidates"][0]["content"]["parts"])
+                log(f"Gemini respondió con {modelo}.")
+                return json.loads(texto)
+            except urllib.error.HTTPError as e:
+                saturado |= e.code in (429, 500, 503)
+                ultimo_error = f"{modelo}: HTTP {e.code} {e.read().decode('utf-8', 'replace')[:120]}"
+            except Exception as e:
+                saturado = True  # timeouts y cortes de red también son pasajeros
+                ultimo_error = f"{modelo}: {e}"
+            log(f"AVISO: falló {ultimo_error}; probando el siguiente modelo.")
+        if not saturado:
+            break  # error de clave o de modelo: reintentar no sirve
     raise RuntimeError(f"ningún modelo de Gemini respondió ({ultimo_error})")
 
 
@@ -628,8 +645,12 @@ Titulares:
             except Exception as e:
                 # La agenda macro llega igual aunque la IA falle.
                 log(f"ERROR con Gemini: {e}")
-                partes.append("⚠️ <i>No se pudo usar Gemini para elegir las noticias; revisa GEMINI_API_KEY "
-                              "o los logs en Actions.</i>")
+                if "HTTP 503" in str(e) or "HTTP 429" in str(e):
+                    partes.append("⚠️ <i>Gemini estaba saturado y no pudo elegir las noticias "
+                                  "(falla temporal de Google).</i>")
+                else:
+                    partes.append("⚠️ <i>No se pudo usar Gemini para elegir las noticias; revisa GEMINI_API_KEY "
+                                  "o los logs.</i>")
 
     if seleccion:
         partes.append("📰 <b>Lo más importante</b>\n\n" + bloques_por_tema(seleccion))
@@ -743,6 +764,16 @@ def main():
         else:
             modo = "calendario"  # antes del resumen: solo avisos del calendario
     log(f"Modo: {modo}")
+
+    global limite_gemini
+    if not args.sin_espera:
+        limite_gemini = ahora() + timedelta(minutes=config.MINUTOS_MAX_GEMINI)
+        # Los reintentos no deben retrasar el próximo aviso o dato del calendario.
+        for fecha, _ in agrupar_por_hora(eventos):
+            for momento in (fecha - timedelta(minutes=config.MINUTOS_ANTES),
+                            fecha + timedelta(minutes=config.MINUTOS_DESPUES)):
+                if momento > ahora():
+                    limite_gemini = min(limite_gemini, momento - timedelta(minutes=1))
 
     fallo = False
     try:

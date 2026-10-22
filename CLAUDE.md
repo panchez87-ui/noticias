@@ -19,7 +19,8 @@ Decisiones:
 - Crear la tarea con Register-ScheduledTask lo bloquea el clasificador de permisos: la registra el usuario con `instalar.ps1` (también crea `.venv` y `.env` desde `.env.example`).
 - Varias PC: el push de la marca `ultima_corrida_pc` hace de candado (`tomar_turno` en local.py); si otra PC subió antes en esa hora, esta no corre.
 - Gemini asigna el tema de cada noticia leyendo el titular; la búsqueda que la encontró a veces no coincide.
-- Gemini en tier gratuito: `gemini-3.8-flash` y, como respaldo, `gemini-3.5-flash-lite` (verificado el 2026-10-15). Si Gemini falla, el resumen se envía igual con la agenda macro.
+- Gemini en tier gratuito: `gemini-3.8-flash`, luego `gemini-3.5-flash-lite` y `gemini-3.5-flash` (`gemini-2.5-flash` da 404). Si Gemini falla, el resumen se envía igual con la agenda macro.
+- Saturación de Gemini (2026-10-22): desde el 21-oct `3.8-flash` da HTTP 503 «high demand» a menudo, y el 22-oct a las 8:00 fallaron ambos modelos, así que el resumen salió sin noticias. Por pedido del usuario, `preguntar_gemini` vuelve a probar la lista cada 3 min (`MINUTOS_REINTENTO_GEMINI`) si el error es 429/500/503 o timeout, hasta 40 min (`MINUTOS_MAX_GEMINI`) o hasta 1 min antes del próximo aviso/dato del calendario (`limite_gemini`, lo fija `main`), porque los datos macro tienen prioridad. Con un error de clave no reintenta; con `--sin-espera`, un solo intento. Ese día el resumen se reenvió a mano llamando a `hacer_resumen` (correr `main.py --sin-espera` sin dry-run enviaría los avisos del calendario antes de tiempo). El aviso en Telegram distingue saturación de un problema con la clave.
 
 Python local: `.venv` (3.14). Pruebas: `bot/main.py --dry-run --sin-espera [--modo resumen|urgentes|calendario]`.
 Los archivos usan CRLF en Windows (core.autocrlf=true): editar con la herramienta Edit, no con scripts que comparen texto con LF.

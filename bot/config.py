@@ -204,7 +204,12 @@ RUIDO_TENDENCIAS = (r"outperforms|underperforms|company announcement|stock price
 # cuota, se prueba el siguiente. Verifica de vez en cuando que sigan vigentes:
 # https://ai.google.dev/gemini-api/docs/models
 # ---------------------------------------------------------------------------
-MODELOS_GEMINI = ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+MODELOS_GEMINI = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"]
+# Si todos dan saturación (503/429/500), se vuelve a probar la lista cada
+# MINUTOS_REINTENTO_GEMINI, hasta MINUTOS_MAX_GEMINI o hasta 1 minuto antes del
+# próximo mensaje del calendario (los datos macro tienen prioridad).
+MINUTOS_REINTENTO_GEMINI = 3
+MINUTOS_MAX_GEMINI = 40
 
 # Criterio para las alertas fuera del resumen. Mientras más estricto, menos mensajes.
 CRITERIO_URGENTE = """Solo hechos que un analista de commodities necesita saber YA porque
