@@ -195,6 +195,12 @@ MEDIOS_TENDENCIAS = [
     "apnews.com", "bbc.com", "marketwatch.com", "finance.yahoo.com",
 ]
 MAX_TENDENCIAS = 3
+# Fuera del resumen, cada corrida vuelve a contar las historias de las últimas
+# HORAS_COMENTADO horas y avisa las que pasan el umbral (aunque caigan en un tema).
+# Cada historia se avisa una sola vez (tampoco si ya salió en el resumen).
+HORAS_COMENTADO = 6
+COMENTADO_MIN_TITULARES = 8
+COMENTADO_MIN_MEDIOS = 3
 # Páginas automáticas (cotizaciones, comunicados, fichas) que no son noticias.
 RUIDO_TENDENCIAS = (r"outperforms|underperforms|company announcement|stock price|quote|profile|\betf\b|"
                     r"net asset|trading halt|stock chart|real time|transaction in own|jim cramer|full interview")
@@ -218,5 +224,8 @@ cierre de infraestructura energética (oleoductos, refinerías, Estrecho de Ormu
 o prohibiciones de exportación nuevas, acción de emergencia o giro inesperado de la Fed,
 dato macro muy por fuera de lo esperado, quiebra o fusión gigante en el sector, anuncio de
 inversión en IA o centros de datos de decenas de miles de millones, informe del USDA que
-sorprende fuertemente al mercado del maíz. NO son urgentes: análisis, opiniones,
+sorprende fuertemente al mercado del maíz, resultados trimestrales de una de las 7 magníficas
+(Apple, Microsoft, Alphabet, Amazon, Meta, Nvidia, Tesla) por encima o por debajo de lo
+esperado que muevan fuerte su acción, caída o subida fuerte del S&P 500 o del Nasdaq (más de
+~2 % en el día). NO son urgentes: análisis, opiniones,
 previsiones de bancos, movimientos de precio normales, notas repetidas de algo ya conocido."""

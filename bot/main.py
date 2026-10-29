@@ -77,6 +77,7 @@ def cargar_estado():
     estado.setdefault("avisados", {})      # eventos del calendario ya avisados
     estado.setdefault("publicados", {})    # eventos cuyo dato real ya se envió
     estado.setdefault("urgentes", [])      # titulares enviados como urgentes
+    estado.setdefault("comentados", [])    # historias muy comentadas ya avisadas (resumen de Gemini)
     estado.setdefault("ultimo_resumen", None)
     return estado
 
@@ -95,6 +96,7 @@ def guardar_estado(estado, dry_run):
     estado["avisados"] = {k: v for k, v in estado["avisados"].items() if v >= limite}
     estado["publicados"] = {k: v for k, v in estado["publicados"].items() if v >= limite}
     estado["urgentes"] = [u for u in estado["urgentes"] if u["fecha"] >= limite]
+    estado["comentados"] = [c for c in estado["comentados"] if c["fecha"] >= limite]
     ARCHIVO_ESTADO.parent.mkdir(parents=True, exist_ok=True)
     ARCHIVO_ESTADO.write_text(json.dumps(estado, ensure_ascii=False, indent=1, sort_keys=True),
                               encoding="utf-8")
@@ -543,13 +545,14 @@ def recolectar_tendencias(desde):
     return titulares
 
 
-def lo_mas_comentado(titulares, seleccion):
-    """Las historias con fondo económico más repetidas que no caen en un bloque de TEMAS
-    ni repiten una de las noticias ya elegidas para el resumen (`seleccion`)."""
-    if not titulares:
-        return ""
+def agrupar_historias(titulares, conocidas):
+    """Agrupa los titulares por historia con Gemini y los cuenta.
+
+    Devuelve (n_titulares, n_medios, resumen, primer titular, historia de Gemini) de
+    las historias con fondo económico, de la más repetida a la menos. `conocidas` son
+    resúmenes que el analista ya recibió: Gemini marca "repite_bloque" en las que repiten."""
     lista = "\n".join(f"[{i}] {n['titulo']}" for i, n in enumerate(titulares))
-    en_bloques = "\n".join(f"- {resumen}" for _, resumen, _, _ in seleccion) or "(ninguna)"
+    en_bloques = "\n".join(f"- {c}" for c in conocidas) or "(ninguna)"
     prompt = f"""Eres analista de mercados. Abajo hay {len(titulares)} titulares de medios grandes,
 numerados. Agrupa los que cuentan la MISMA historia (el mismo hecho o el mismo conflicto en
 desarrollo, p. ej. "protestas en Francia" o "resultados de los bancos de EE. UU."). Devuelve
@@ -557,17 +560,18 @@ las 20 historias con MÁS titulares, de cualquier ámbito (empresas, geopolític
 política, sociedad...). Para cada una:
 - "ids": la lista COMPLETA de los números de sus titulares;
 - "tema": si la historia trata directamente de uno de estos temas, su clave:
-  {temas_para_prompt()}; si no, "otro";
+  {temas_para_prompt()}; si no, "otro". Los resultados trimestrales de una empresa y los
+  movimientos de su acción o de la bolsa son "otro", aunque la empresa sea de IA o de energía;
 - "fondo_economico": true solo si tiene un efecto económico claro (mueve mercados, divisas,
   bonos, empresas concretas, commodities, comercio o finanzas públicas); false para sucesos
   políticos, sociales o humanos sin ese efecto;
 - "repite_bloque": true si el hecho central de la historia es el mismo que el de alguna de
-  las noticias de abajo, que ya van en el resumen (no basta con que una de ellas la mencione
+  las noticias de abajo, que el analista ya recibió (no basta con que una de ellas la mencione
   como causa de otra cosa);
 - "resumen": en español, 1 o 2 frases: qué está pasando y por qué importa en lo económico.
 No des recomendaciones de inversión.
 
-Noticias que ya van en el resumen:
+Noticias que el analista ya recibió:
 {en_bloques}
 
 Responde solo con JSON: {{"historias": [{{"ids": [<números>], "tema": "<clave u otro>", "fondo_economico": true, "repite_bloque": false, "resumen": "<texto>"}}]}}
@@ -583,18 +587,64 @@ Titulares:
                     ids.add(int(i))
             except (ValueError, TypeError):
                 continue
-        if (not ids or h.get("fondo_economico") is not True or h.get("tema") in config.TEMAS
-                or h.get("repite_bloque") is True):
+        if not ids or h.get("fondo_economico") is not True:
             continue
         medios = {titulares[i]["medio"] for i in ids}
-        historias.append((len(ids), len(medios), str(h.get("resumen", "")).strip(), titulares[min(ids)]))
+        historias.append((len(ids), len(medios), str(h.get("resumen", "")).strip(), titulares[min(ids)], h))
     historias.sort(key=lambda x: x[0], reverse=True)
+    return historias
+
+
+def linea_comentada(n_titulares, n_medios, resumen, n):
+    enlace = f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>'
+    return f"• {html.escape(resumen)} <i>({n_titulares} titulares en {n_medios} medios)</i> ({enlace})"
+
+
+def lo_mas_comentado(titulares, seleccion, estado):
+    """Las historias con fondo económico más repetidas que no caen en un bloque de TEMAS
+    ni repiten una de las noticias ya elegidas para el resumen (`seleccion`)."""
+    if not titulares:
+        return ""
+    conocidas = [resumen for _, resumen, _, _ in seleccion]
+    historias = [h for h in agrupar_historias(titulares, conocidas)
+                 if h[4].get("tema") not in config.TEMAS and h[4].get("repite_bloque") is not True]
     lineas = []
-    for n_titulares, n_medios, resumen, n in historias[:config.MAX_TENDENCIAS]:
-        enlace = f'<a href="{html.escape(n["link"], quote=True)}">{html.escape(n["fuente"])}</a>'
-        lineas.append(f"• {html.escape(resumen)} <i>({n_titulares} titulares en {n_medios} medios)</i> ({enlace})")
+    for n_titulares, n_medios, resumen, n, _ in historias[:config.MAX_TENDENCIAS]:
+        lineas.append(linea_comentada(n_titulares, n_medios, resumen, n))
+        # Lo que ya salió en el resumen no se vuelve a avisar durante el día.
+        estado["comentados"].append({"resumen": resumen, "fecha": ahora().isoformat()})
+    estado["comentados"] += [{"resumen": r, "fecha": ahora().isoformat()} for r in conocidas]
     log(f"Lo más comentado: {len(historias)} historias candidatas; se muestran {len(lineas)}.")
     return "\n\n".join(lineas)
+
+
+def revisar_comentados(estado, args):
+    """Fuera del resumen: avisa las historias que se repiten mucho en las últimas horas."""
+    desde = datetime.now(timezone.utc) - timedelta(hours=config.HORAS_COMENTADO)
+    titulares = recolectar_tendencias(desde)
+    if not titulares:
+        return
+    if args.dry_run and not os.environ.get("GEMINI_API_KEY"):
+        log("Sin GEMINI_API_KEY en dry-run: no se cuentan las historias más comentadas.")
+        return
+    hoy = ahora().date().isoformat()
+    conocidas = [c["resumen"] for c in estado["comentados"] if c["fecha"][:10] == hoy]
+    historias = agrupar_historias(titulares, conocidas)
+    for n_titulares, n_medios, resumen, _, h in historias[:5]:
+        log(f"Comentado: {n_titulares} titulares / {n_medios} medios"
+            f"{' (ya avisada)' if h.get('repite_bloque') is True else ''} — {resumen[:90]}")
+    nuevas = [x for x in historias if x[0] >= config.COMENTADO_MIN_TITULARES
+              and x[1] >= config.COMENTADO_MIN_MEDIOS and x[4].get("repite_bloque") is not True]
+    if not nuevas:
+        log("Comentado: ninguna historia nueva pasa el umbral; no se envía nada.")
+        return
+    lineas = []
+    for n_titulares, n_medios, resumen, n, _ in nuevas[:config.MAX_TENDENCIAS]:
+        lineas.append(linea_comentada(n_titulares, n_medios, resumen, n))
+        estado["comentados"].append({"resumen": resumen, "fecha": ahora().isoformat()})
+    enviar_telegram(f"🔥 <b>Muy comentado ahora</b> <i>(últimas {config.HORAS_COMENTADO} h)</i>\n\n"
+                    + "\n\n".join(lineas), args.dry_run)
+    log(f"Comentado: se avisan {min(len(nuevas), config.MAX_TENDENCIAS)} historias.")
 
 
 def hacer_resumen(estado, eventos, error_calendario, args):
@@ -661,7 +711,7 @@ Titulares:
         log("Sin GEMINI_API_KEY en dry-run: no se calcula «Lo más comentado».")
     else:
         try:
-            comentado = lo_mas_comentado(recolectar_tendencias(desde), seleccion)
+            comentado = lo_mas_comentado(recolectar_tendencias(desde), seleccion, estado)
             if comentado:
                 partes.append("🔥 <b>Lo más comentado</b>\n\n" + comentado)
         except Exception as e:
@@ -684,11 +734,16 @@ def revisar_urgentes(estado, args):
         return
 
     ya_enviadas = "\n".join(f"- {u['titulo']}" for u in estado["urgentes"]) or "(ninguna)"
-    prompt = f"""Filtras alertas para un analista de commodities y macro. Abajo hay titulares
+    prompt = f"""Filtras alertas para un analista de commodities, macro y acciones. Abajo hay titulares
 nuevos, numerados. La regla es casi nunca molestar: elige un titular SOLO si cumple este
 criterio:
 
 {config.CRITERIO_URGENTE}
+
+Ojo: el analista también sigue la bolsa de EE. UU. Los resultados trimestrales que sorprenden
+(arriba o abajo de lo esperado) de Apple, Microsoft, Alphabet, Amazon, Meta, Nvidia o Tesla, y
+una caída o subida fuerte de Wall Street por esos resultados, SÍ son urgentes aunque no tengan
+que ver con commodities.
 
 Tampoco elijas nada que repita un hecho ya alertado hoy:
 {ya_enviadas}
@@ -785,6 +840,12 @@ def main():
         # Un fallo en las noticias no debe impedir los avisos del calendario.
         log(f"ERROR en noticias: {e}")
         fallo = True
+    if modo == "urgentes":
+        try:
+            revisar_comentados(estado, args)
+        except Exception as e:
+            log(f"ERROR en «Muy comentado»: {e}")
+            fallo = True
     guardar_estado(estado, args.dry_run)
 
     if eventos:
