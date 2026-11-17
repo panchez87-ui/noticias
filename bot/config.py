@@ -199,8 +199,13 @@ MAX_TENDENCIAS = 3
 # HORAS_COMENTADO horas y avisa las que pasan el umbral (aunque caigan en un tema).
 # Cada historia se avisa una sola vez (tampoco si ya salió en el resumen).
 HORAS_COMENTADO = 6
-COMENTADO_MIN_TITULARES = 8
-COMENTADO_MIN_MEDIOS = 3
+# 2026-11-17: antes 8 titulares en 3 medios. Pesa más que varios medios distintos la
+# cubran a la vez (la caída de los bancos de EE. UU. del 16-nov tuvo 7 en 5 y no llegó).
+COMENTADO_MIN_TITULARES = 6
+COMENTADO_MIN_MEDIOS = 5
+# En el resumen, las historias que ya salieron en los últimos DIAS_HISTORIA_VIEJA días
+# (sin contar hoy) van detrás de las nuevas, aunque tengan más titulares.
+DIAS_HISTORIA_VIEJA = 3
 # Páginas automáticas (cotizaciones, comunicados, fichas) que no son noticias.
 RUIDO_TENDENCIAS = (r"outperforms|underperforms|company announcement|stock price|quote|profile|\betf\b|"
                     r"net asset|trading halt|stock chart|real time|transaction in own|jim cramer|full interview")

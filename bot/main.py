@@ -545,14 +545,21 @@ def recolectar_tendencias(desde):
     return titulares
 
 
-def agrupar_historias(titulares, conocidas):
+def agrupar_historias(titulares, conocidas, anteriores=()):
     """Agrupa los titulares por historia con Gemini y los cuenta.
 
     Devuelve (n_titulares, n_medios, resumen, primer titular, historia de Gemini) de
     las historias con fondo económico, de la más repetida a la menos. `conocidas` son
-    resúmenes que el analista ya recibió: Gemini marca "repite_bloque" en las que repiten."""
+    resúmenes que el analista ya recibió: Gemini marca "repite_bloque" en las que repiten.
+    `anteriores` son los de días anteriores: Gemini marca "vieja" en las que siguen."""
     lista = "\n".join(f"[{i}] {n['titulo']}" for i, n in enumerate(titulares))
     en_bloques = "\n".join(f"- {c}" for c in conocidas) or "(ninguna)"
+    campo_vieja = vieja_json = lista_vieja = ""
+    if anteriores:
+        campo_vieja = ("- \"vieja\": true si es la misma historia (o su continuación) que alguna de las\n"
+                       "  noticias de días anteriores de más abajo;\n")
+        vieja_json = ', "vieja": false'
+        lista_vieja = ("\nNoticias de días anteriores:\n" + "\n".join(f"- {a}" for a in anteriores) + "\n")
     prompt = f"""Eres analista de mercados. Abajo hay {len(titulares)} titulares de medios grandes,
 numerados. Agrupa los que cuentan la MISMA historia (el mismo hecho o el mismo conflicto en
 desarrollo, p. ej. "protestas en Francia" o "resultados de los bancos de EE. UU."). Devuelve
@@ -568,13 +575,13 @@ política, sociedad...). Para cada una:
 - "repite_bloque": true si el hecho central de la historia es el mismo que el de alguna de
   las noticias de abajo, que el analista ya recibió (no basta con que una de ellas la mencione
   como causa de otra cosa);
-- "resumen": en español, 1 o 2 frases: qué está pasando y por qué importa en lo económico.
+{campo_vieja}- "resumen": en español, 1 o 2 frases: qué está pasando y por qué importa en lo económico.
 No des recomendaciones de inversión.
 
 Noticias que el analista ya recibió:
 {en_bloques}
-
-Responde solo con JSON: {{"historias": [{{"ids": [<números>], "tema": "<clave u otro>", "fondo_economico": true, "repite_bloque": false, "resumen": "<texto>"}}]}}
+{lista_vieja}
+Responde solo con JSON: {{"historias": [{{"ids": [<números>], "tema": "<clave u otro>", "fondo_economico": true, "repite_bloque": false{vieja_json}, "resumen": "<texto>"}}]}}
 
 Titulares:
 {lista}"""
@@ -606,8 +613,16 @@ def lo_mas_comentado(titulares, seleccion, estado):
     if not titulares:
         return ""
     conocidas = [resumen for _, resumen, _, _ in seleccion]
-    historias = [h for h in agrupar_historias(titulares, conocidas)
+    hoy = ahora().date()
+    desde_viejas = (hoy - timedelta(days=config.DIAS_HISTORIA_VIEJA)).isoformat()
+    anteriores = [c["resumen"] for c in estado["comentados"] if desde_viejas <= c["fecha"][:10] < hoy.isoformat()]
+    historias = [h for h in agrupar_historias(titulares, conocidas, anteriores)
                  if h[4].get("tema") not in config.TEMAS and h[4].get("repite_bloque") is not True]
+    # Las nuevas primero; dentro de cada grupo, de la más repetida a la menos (sort estable).
+    historias.sort(key=lambda h: h[4].get("vieja") is True)
+    for n_titulares, n_medios, resumen, _, h in historias[:6]:
+        log(f"Candidata: {n_titulares} titulares / {n_medios} medios"
+            f"{' (vieja)' if h.get('vieja') is True else ''} — {resumen[:90]}")
     lineas = []
     for n_titulares, n_medios, resumen, n, _ in historias[:config.MAX_TENDENCIAS]:
         lineas.append(linea_comentada(n_titulares, n_medios, resumen, n))
